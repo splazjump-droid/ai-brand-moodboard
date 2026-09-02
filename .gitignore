@@ -1,0 +1,22 @@
+# зависимости
+node_modules/
+
+# сборка Next.js
+.next/
+out/
+build/
+
+# переменные окружения — ключи Polza и прочее
+.env
+.env.*
+!.env.example
+
+# личные переопределения Claude Code (проектный settings.json коммитим)
+.claude/settings.local.json
+
+# macOS
+.DS_Store
+
+# логи
+*.log
+npm-debug.log*
