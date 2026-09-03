@@ -32,12 +32,12 @@
 
 | Файл | Отвечает за |
 |---|---|
-| `lib/catalog/styles.json` | срез `styles.csv`: id, ключевые слова, для чего годится |
+| `lib/catalog/directions.json` | девять брендовых направлений, собраны руками |
 | `lib/catalog/palettes.json` | срез `colors.csv`: семантические роли цвета |
 | `lib/catalog/font-pairs.json` | пары шрифтов, собранные вручную, все с кириллицей |
 | `lib/catalog/index.ts` | типизированный доступ к трём срезам |
 | `scripts/build-catalog.mjs` | пересборка срезов из локального каталога |
-| `lib/vocab.ts` | чипы формы → id стилей каталога |
+| `lib/vocab.ts` | чипы формы → id направлений каталога |
 | `lib/brief-schema.ts` | схема брифа, источник лимитов для промпта |
 | `lib/brief-quality.ts` | индикатор полноты брифа |
 | `lib/directions-schema.ts` | схема ответа модели |
@@ -447,35 +447,255 @@ git commit -m "Каталог: срез стилей, палитр и шрифт
 
 ---
 
-### Task 3: Словарь чипов
+### Task 3: Девять брендовых направлений и словарь чипов
+
+`styles.csv` как источник визуальных направлений забракован: половина его строк — чужие дизайн-системы (`fluent-2` это Microsoft 365, `shopify-polaris` это админка Shopify) и приёмы отделки интерфейса. Направления собираются руками, ровно как до этого шрифтовые пары.
 
 **Files:**
+- Create: `lib/catalog/directions.json`
+- Modify: `lib/catalog/index.ts`, `scripts/build-catalog.mjs`
+- Delete: `lib/catalog/styles.json`
 - Create: `lib/vocab.ts`
-- Test: `lib/vocab.test.ts`
+- Test: `lib/catalog/directions.test.ts`, `lib/vocab.test.ts`
 
 **Interfaces:**
-- Consumes: `STYLES`, `findStyle` из `@/lib/catalog`
+- Consumes: `PALETTES`, `FONT_PAIRS`, `findPalette`, `findFontPair` из `@/lib/catalog`
 - Produces:
-  - `CHARACTER_CHIPS: Chip[]` и `AESTHETIC_CHIPS: Chip[]`, где `Chip = { id: string; label: string; styleIds: string[] }`
-  - `stylesForChips(chipIds: string[]): Style[]` — стили без повторов, в порядке появления
+  - `TIERS = ["safe", "bold", "experimental"] as const`, `type Tier = (typeof TIERS)[number]`
+  - `interface Direction { id: string; name: string; tier: Tier; keywords: string[]; language: string; paletteIds: string[]; fontPairIds: string[] }`
+  - `DIRECTIONS: Direction[]`, `findDirection(id: string): Direction | undefined`, `directionsByTier(tier: Tier): Direction[]`
+  - `interface Chip { id: string; label: string; directionIds: string[] }`
+  - `CHARACTER_CHIPS: Chip[]`, `AESTHETIC_CHIPS: Chip[]`, `directionsForChips(chipIds: string[]): Direction[]`
 
-- [ ] **Step 1: Написать падающий тест**
+Имя `Direction` здесь — это направление из каталога. Не путать с `Direction` из `lib/directions-schema.ts` (задача 7) — то ответ модели. Чтобы имена не сталкивались, тип каталога называется `Direction` и живёт в `lib/catalog/`, а тип ответа модели в задаче 7 называется `GeneratedDirection`.
+
+- [ ] **Step 1: Написать падающий тест каталога направлений**
+
+Создать `lib/catalog/directions.test.ts`:
+
+```ts
+import { describe, it, expect } from "vitest";
+import { DIRECTIONS, TIERS, findDirection, directionsByTier } from "./index";
+import { findPalette, findFontPair } from "./index";
+
+describe("каталог направлений", () => {
+  it("девять направлений, по три на каждый уровень риска", () => {
+    expect(DIRECTIONS).toHaveLength(9);
+    for (const tier of TIERS) {
+      expect(directionsByTier(tier), tier).toHaveLength(3);
+    }
+  });
+
+  it("id уникальны и годятся для адреса", () => {
+    expect(new Set(DIRECTIONS.map((d) => d.id)).size).toBe(DIRECTIONS.length);
+    for (const d of DIRECTIONS) expect(d.id).toMatch(/^[a-z0-9-]+$/);
+  });
+
+  it("названия на русском, ключевые слова тоже", () => {
+    for (const d of DIRECTIONS) {
+      expect(d.name, d.id).toMatch(/[а-яё]/i);
+      expect(d.keywords.length, d.id).toBeGreaterThanOrEqual(3);
+      for (const k of d.keywords) expect(k, d.id).toMatch(/[а-яё]/i);
+    }
+  });
+
+  it("описание визуального языка для промпта на английском и непустое", () => {
+    for (const d of DIRECTIONS) {
+      expect(d.language.length, d.id).toBeGreaterThan(30);
+      expect(d.language, d.id).not.toMatch(/[а-яё]/i);
+    }
+  });
+
+  it("каждое направление называет существующие палитры", () => {
+    for (const d of DIRECTIONS) {
+      expect(d.paletteIds.length, d.id).toBeGreaterThanOrEqual(2);
+      for (const id of d.paletteIds) {
+        expect(findPalette(id), `${d.id} ссылается на неизвестную палитру ${id}`).toBeDefined();
+      }
+    }
+  });
+
+  it("каждое направление называет существующие пары шрифтов", () => {
+    for (const d of DIRECTIONS) {
+      expect(d.fontPairIds.length, d.id).toBeGreaterThanOrEqual(2);
+      for (const id of d.fontPairIds) {
+        expect(findFontPair(id), `${d.id} ссылается на неизвестную пару ${id}`).toBeDefined();
+      }
+    }
+  });
+
+  it("не тянет запрещённые палитры с фиолетовым на белом", () => {
+    const banned = ["micro-saas", "mental-health-app", "ai-chatbot-platform", "membership-community"];
+    for (const d of DIRECTIONS) {
+      for (const id of d.paletteIds) expect(banned, d.id).not.toContain(id);
+    }
+  });
+
+  it("findDirection находит по id и молчит на неизвестном", () => {
+    expect(findDirection(DIRECTIONS[0].id)?.id).toBe(DIRECTIONS[0].id);
+    expect(findDirection("нет-такого")).toBeUndefined();
+  });
+});
+```
+
+- [ ] **Step 2: Убедиться, что тест падает**
+
+Run: `npm test -- directions`
+Expected: FAIL, `DIRECTIONS` не экспортируется из `./index`.
+
+- [ ] **Step 3: Написать каталог направлений**
+
+Создать `lib/catalog/directions.json`. Все `paletteIds` и `fontPairIds` ниже сверены с содержимым `lib/catalog/palettes.json` и `lib/catalog/font-pairs.json` при написании плана.
+
+```json
+[
+  {
+    "id": "swiss",
+    "name": "Швейцарская школа",
+    "tier": "safe",
+    "keywords": ["сетка", "порядок", "воздух", "нейтральность", "ясность"],
+    "language": "International Typographic Style. Strict modular grid, generous white space, one accent colour, flush-left ragged-right setting, photography cropped hard. Nothing decorative survives.",
+    "paletteIds": ["portfolio-personal", "architecture-interior", "museum-gallery", "construction-architecture"],
+    "fontPairIds": ["grotesque-clean", "geometric-soft", "serif-strict"]
+  },
+  {
+    "id": "editorial",
+    "name": "Журнальная подача",
+    "tier": "safe",
+    "keywords": ["разворот", "колонки", "буквица", "текст как картинка", "ритм"],
+    "language": "Magazine editorial. Large display headline against a fine text face, multi-column body, pull quotes, generous leading, images bleeding to the margin. Reads like a printed spread.",
+    "paletteIds": ["magazine-blog", "news-media-platform", "museum-gallery", "e-commerce-luxury"],
+    "fontPairIds": ["editorial-classic", "editorial-modern", "condensed-poster"]
+  },
+  {
+    "id": "midcentury",
+    "name": "Середина века",
+    "tier": "safe",
+    "keywords": ["тепло", "охра", "простая форма", "домашнее", "спокойствие"],
+    "language": "Mid-century modern. Warm earthy palette, simple rounded geometry, hand-set warmth without nostalgia kitsch, muted print-like colour, calm asymmetry.",
+    "paletteIds": ["bakery-cafe", "brewery-winery", "restaurant-food-service", "agriculture-farm-tech"],
+    "fontPairIds": ["serif-warm", "geometric-soft", "antique-refined"]
+  },
+  {
+    "id": "neo-brutal",
+    "name": "Нео-брутализм",
+    "tier": "bold",
+    "keywords": ["контраст", "обводка", "плотность", "прямота", "напор"],
+    "language": "Neo-brutalism. Thick black outlines, hard offset shadows, oversized type, raw unmodulated colour blocks, deliberate roughness. Loud and unpolished on purpose.",
+    "paletteIds": ["sports-team-club", "automotive-car-dealership", "photography-studio", "portfolio-personal"],
+    "fontPairIds": ["display-heavy", "condensed-poster", "tech-terminal"]
+  },
+  {
+    "id": "retro-futur",
+    "name": "Ретрофутуризм",
+    "tier": "bold",
+    "keywords": ["неон", "закат", "хром", "космос", "восьмидесятые"],
+    "language": "Retro-futurism. Eighties science fiction optimism, neon glow on deep night ground, chrome and gradient sheen, horizon grids, wide letterspaced display type.",
+    "paletteIds": ["theater-cinema", "space-tech-aerospace", "music-streaming", "gaming"],
+    "fontPairIds": ["display-loud", "tech-precise", "condensed-poster"]
+  },
+  {
+    "id": "bauhaus",
+    "name": "Баухаус и конструктивизм",
+    "tier": "bold",
+    "keywords": ["круг и квадрат", "диагональ", "первичный цвет", "агитация", "конструкция"],
+    "language": "Bauhaus and constructivism. Primary colour on off-white, circle-square-triangle vocabulary, strong diagonals, heavy geometric sans, poster composition with visible structure.",
+    "paletteIds": ["sports-team-club", "construction-architecture", "saas-general", "portfolio-personal"],
+    "fontPairIds": ["grotesque-clean", "display-heavy", "geometric-soft"]
+  },
+  {
+    "id": "y2k",
+    "name": "Y2K",
+    "tier": "experimental",
+    "keywords": ["хром", "глянец", "пузырь", "переливы", "нулевые"],
+    "language": "Y2K aesthetic. Liquid chrome, iridescent gradients, bubbly inflated shapes, lens flare, early-web optimism rendered at high gloss.",
+    "paletteIds": ["nft-web3-platform", "quantum-computing-interface", "gaming", "subscription-box-service"],
+    "fontPairIds": ["display-loud", "tech-terminal", "display-heavy"]
+  },
+  {
+    "id": "memphis",
+    "name": "Мемфис",
+    "tier": "experimental",
+    "keywords": ["зигзаг", "крапинка", "асимметрия", "игра", "постмодерн"],
+    "language": "Memphis Group postmodernism. Squiggles, confetti dots, terrazzo texture, clashing saturated colour, deliberately unbalanced composition, playful and unserious.",
+    "paletteIds": ["creator-economy-platform", "childcare-daycare", "creative-agency", "subscription-box-service"],
+    "fontPairIds": ["display-heavy", "geometric-soft", "display-loud"]
+  },
+  {
+    "id": "collage",
+    "name": "Коллаж и максимализм",
+    "tier": "experimental",
+    "keywords": ["вырезка", "слои", "плёнка", "шум", "рукотворность"],
+    "language": "Cut-and-paste collage maximalism. Scanned paper edges, layered photographic fragments, halftone and grain, mixed type sizes inside one line, controlled visual noise.",
+    "paletteIds": ["generative-art-platform", "magazine-blog", "marketing-agency", "creator-economy-platform"],
+    "fontPairIds": ["condensed-poster", "display-heavy", "editorial-modern"]
+  }
+]
+```
+
+- [ ] **Step 4: Подключить направления и убрать стили**
+
+`styles.json` больше никто не потребляет — направления заменили его целиком. Удалить файл, убрать его сборку из скрипта, убрать экспорты из `index.ts`.
+
+В `scripts/build-catalog.mjs` удалить блок, собирающий `styles`, и упоминание `styles.json` в `writeFileSync` и в итоговом `console.log`. Разбор `colors.csv` и запись `palettes.json` остаются как есть.
+
+```bash
+git rm lib/catalog/styles.json
+```
+
+В `lib/catalog/index.ts` удалить `import stylesJson`, интерфейс `Style`, константу `STYLES` и функцию `findStyle`. Добавить:
+
+```ts
+import directionsJson from "./directions.json";
+
+export const TIERS = ["safe", "bold", "experimental"] as const;
+export type Tier = (typeof TIERS)[number];
+
+export interface Direction {
+  id: string;
+  name: string;
+  tier: Tier;
+  keywords: string[];
+  /** Описание визуального языка для промпта, по-английски. */
+  language: string;
+  paletteIds: string[];
+  fontPairIds: string[];
+}
+
+export const DIRECTIONS: Direction[] = directionsJson as Direction[];
+
+export const findDirection = (id: string) => DIRECTIONS.find((d) => d.id === id);
+
+export const directionsByTier = (tier: Tier) => DIRECTIONS.filter((d) => d.tier === tier);
+```
+
+- [ ] **Step 5: Прогнать тест каталога**
+
+Run: `npm test -- directions`
+Expected: PASS, все восемь проверок.
+
+- [ ] **Step 6: Написать падающий тест словаря чипов**
 
 Создать `lib/vocab.test.ts`:
 
 ```ts
 import { describe, it, expect } from "vitest";
-import { CHARACTER_CHIPS, AESTHETIC_CHIPS, stylesForChips } from "./vocab";
-import { findStyle } from "./catalog";
+import { CHARACTER_CHIPS, AESTHETIC_CHIPS, directionsForChips } from "./vocab";
+import { findDirection, DIRECTIONS } from "./catalog";
 
 const ALL = [...CHARACTER_CHIPS, ...AESTHETIC_CHIPS];
 
 describe("словарь чипов", () => {
-  it("каждый чип ссылается на существующие стили каталога", () => {
+  it("по шесть чипов в каждом списке", () => {
+    expect(CHARACTER_CHIPS).toHaveLength(6);
+    expect(AESTHETIC_CHIPS).toHaveLength(6);
+  });
+
+  it("каждый чип ссылается на существующие направления", () => {
     for (const chip of ALL) {
-      expect(chip.styleIds.length).toBeGreaterThan(0);
-      for (const id of chip.styleIds) {
-        expect(findStyle(id), `чип «${chip.label}» ссылается на неизвестный стиль ${id}`).toBeDefined();
+      expect(chip.directionIds.length, chip.label).toBeGreaterThanOrEqual(2);
+      for (const id of chip.directionIds) {
+        expect(findDirection(id), `чип «${chip.label}» ссылается на неизвестное направление ${id}`).toBeDefined();
       }
     }
   });
@@ -488,105 +708,90 @@ describe("словарь чипов", () => {
     for (const chip of ALL) expect(chip.label).toMatch(/[а-яё]/i);
   });
 
-  it("stylesForChips собирает стили без повторов", () => {
-    const withShared = [CHARACTER_CHIPS[0].id, CHARACTER_CHIPS[0].id];
-    const result = stylesForChips(withShared);
-    expect(new Set(result.map((s) => s.id)).size).toBe(result.length);
+  it("каждое направление достижимо хотя бы одним чипом", () => {
+    const reachable = new Set(ALL.flatMap((c) => c.directionIds));
+    for (const d of DIRECTIONS) {
+      expect(reachable.has(d.id), `направление ${d.id} не достижимо ни одним чипом`).toBe(true);
+    }
   });
 
-  it("stylesForChips молча пропускает неизвестный чип", () => {
-    expect(stylesForChips(["нет-такого"])).toEqual([]);
+  it("directionsForChips собирает направления без повторов", () => {
+    const result = directionsForChips([CHARACTER_CHIPS[0].id, CHARACTER_CHIPS[0].id]);
+    expect(new Set(result.map((d) => d.id)).size).toBe(result.length);
+  });
+
+  it("directionsForChips молча пропускает неизвестный чип", () => {
+    expect(directionsForChips(["нет-такого"])).toEqual([]);
   });
 });
 ```
 
-- [ ] **Step 2: Убедиться, что тест падает**
+- [ ] **Step 7: Убедиться, что тест падает**
 
 Run: `npm test -- vocab`
 Expected: FAIL, `Cannot find module './vocab'`
 
-- [ ] **Step 3: Реализация**
+- [ ] **Step 8: Реализация словаря**
 
-Создать `lib/vocab.ts`. Значения `styleIds` брать из реального `lib/catalog/styles.json` — подсмотреть доступные id командой:
-
-```bash
-node -e "console.log(require('./lib/catalog/styles.json').map(s=>s.id).join('\n'))"
-```
+Создать `lib/vocab.ts`:
 
 ```ts
-import { STYLES, type Style } from "./catalog";
+import { DIRECTIONS, type Direction } from "./catalog";
 
 export interface Chip {
   id: string;
   label: string;
-  /** Стили каталога, которые это слово означает на языке данных. */
-  styleIds: string[];
+  /** Направления каталога, которые это слово означает. */
+  directionIds: string[];
 }
 
-// Связка «бытовое слово → строки каталога» живёт здесь, а не в голове
-// модели. Модель получает отобранные стили, а не слово «дерзкий».
+// Связка «бытовое слово → направления» живёт здесь, а не в голове модели.
+// Модель получает отобранные направления, а не слово «дерзкий».
 export const CHARACTER_CHIPS: Chip[] = [
-  { id: "warm", label: "тёплый",
-    styleIds: ["nature-distilled", "organic-biophilic", "e-ink-paper"] },
-  { id: "bold", label: "дерзкий",
-    styleIds: ["neubrutalism", "exaggerated-minimalism", "vibrant-and-block-based"] },
-  { id: "strict", label: "строгий",
-    styleIds: ["minimalism-and-swiss-style", "flat-design", "fluent-2"] },
-  { id: "craft", label: "ремесленный",
-    styleIds: ["anti-polish-raw-aesthetic", "vintage-analog-retro-film", "e-ink-paper"] },
-  { id: "technical", label: "техничный",
-    styleIds: ["hud-sci-fi-fui", "data-dense-dashboard", "cyberpunk-ui"] },
-  { id: "playful", label: "игривый",
-    styleIds: ["claymorphism", "memphis-design", "tactile-digital-deformable-ui"] },
-  { id: "premium", label: "премиальный",
-    styleIds: ["dimensional-layering", "liquid-glass", "spatial-ui-visionos"] },
-  { id: "calm", label: "спокойный",
-    styleIds: ["e-ink-paper", "nature-distilled", "minimalism-and-swiss-style"] },
+  { id: "strict", label: "строгий", directionIds: ["swiss", "editorial", "bauhaus"] },
+  { id: "warm", label: "тёплый", directionIds: ["midcentury", "editorial", "collage"] },
+  { id: "bold", label: "дерзкий", directionIds: ["neo-brutal", "bauhaus", "memphis"] },
+  { id: "technical", label: "техничный", directionIds: ["retro-futur", "y2k", "swiss"] },
+  { id: "playful", label: "игривый", directionIds: ["memphis", "y2k", "collage"] },
+  { id: "premium", label: "премиальный", directionIds: ["editorial", "midcentury", "swiss"] },
 ];
 
 export const AESTHETIC_CHIPS: Chip[] = [
-  { id: "minimal", label: "минимализм",
-    styleIds: ["minimalism-and-swiss-style", "exaggerated-minimalism", "flat-design"] },
-  { id: "editorial", label: "журнальная вёрстка",
-    styleIds: ["editorial-grid-magazine", "e-ink-paper", "kinetic-typography"] },
-  { id: "retro", label: "ретро",
-    styleIds: ["retro-futurism", "y2k-aesthetic", "vintage-analog-retro-film", "pixel-art"] },
-  { id: "brutal", label: "брутализм",
-    styleIds: ["brutalism", "neubrutalism", "anti-polish-raw-aesthetic"] },
-  { id: "organic", label: "природный",
-    styleIds: ["organic-biophilic", "biomimetic-organic-2-0", "nature-distilled"] },
-  { id: "geometric", label: "геометрия",
-    styleIds: ["bauhaus", "bento-box-grid", "memphis-design"] },
-  { id: "handmade", label: "рукотворный",
-    styleIds: ["anti-polish-raw-aesthetic", "gen-z-chaos-maximalism", "vintage-analog-retro-film"] },
-  { id: "futuristic", label: "футуризм",
-    styleIds: ["hud-sci-fi-fui", "cyberpunk-ui", "spatial-ui-visionos", "liquid-glass"] },
+  { id: "minimal", label: "минимализм", directionIds: ["swiss", "bauhaus", "editorial"] },
+  { id: "magazine", label: "журнальная вёрстка", directionIds: ["editorial", "collage", "midcentury"] },
+  { id: "retro", label: "ретро", directionIds: ["midcentury", "retro-futur", "y2k"] },
+  { id: "geometric", label: "геометрия", directionIds: ["bauhaus", "swiss", "memphis"] },
+  { id: "maximal", label: "максимализм", directionIds: ["collage", "memphis", "y2k"] },
+  { id: "futuristic", label: "футуризм", directionIds: ["retro-futur", "y2k", "neo-brutal"] },
 ];
 
 const BY_ID = new Map([...CHARACTER_CHIPS, ...AESTHETIC_CHIPS].map((c) => [c.id, c]));
 
-/** Стили для выбранных чипов, без повторов, в порядке появления. */
-export function stylesForChips(chipIds: string[]): Style[] {
+/** Направления для выбранных чипов, без повторов, в порядке каталога. */
+export function directionsForChips(chipIds: string[]): Direction[] {
   const ids = new Set<string>();
   for (const chipId of chipIds) {
-    for (const styleId of BY_ID.get(chipId)?.styleIds ?? []) ids.add(styleId);
+    for (const directionId of BY_ID.get(chipId)?.directionIds ?? []) ids.add(directionId);
   }
-  return STYLES.filter((s) => ids.has(s.id));
+  return DIRECTIONS.filter((d) => ids.has(d.id));
 }
 ```
 
-Все шестнадцать наборов `styleIds` выше проверены по `lib/catalog/styles.json` при написании плана. Если каталог пересобирали и какой-то id исчез, тест из шага 1 назовёт конкретный чип и конкретный отсутствующий стиль.
-
-- [ ] **Step 4: Прогнать тесты**
-
-Run: `npm test -- vocab`
-Expected: PASS, все пять проверок.
-
-- [ ] **Step 5: Коммит**
+- [ ] **Step 9: Прогнать всё**
 
 ```bash
-git add lib/vocab.ts lib/vocab.test.ts
-git commit -m "Словарь чипов: бытовые слова связаны со стилями каталога"
+npm test
+npx tsc --noEmit
+npm run lint
+npm run build
+```
+Expected: всё зелёное, вывод чистый.
+
+- [ ] **Step 10: Коммит**
+
+```bash
+git add lib/catalog lib/vocab.ts lib/vocab.test.ts scripts/build-catalog.mjs
+git commit -m "Девять брендовых направлений вместо styles.csv, словарь чипов"
 ```
 
 ---
@@ -1039,13 +1244,16 @@ git commit -m "Суточный лимит: хеш адреса, ключ сут
 - Test: `lib/directions-schema.test.ts`, `lib/prompt.test.ts`
 
 **Interfaces:**
-- Consumes: `Brief`, `BRIEF_FIELDS` из `@/lib/brief-schema`; `Style`, `Palette`, `FontPair`, `PALETTES`, `FONT_PAIRS` из `@/lib/catalog`; `stylesForChips` из `@/lib/vocab`
+- Consumes: `Brief`, `BRIEF_FIELDS` из `@/lib/brief-schema`; `Direction`, `Tier`, `TIERS`, `DIRECTIONS`, `findDirection`, `directionsByTier` из `@/lib/catalog`
 - Produces:
-  - `DIRECTION_KEYS = ["safe", "bold", "experimental"] as const`
-  - `DirectionSchema` (zod), `type Direction = z.infer<typeof DirectionSchema>`
-  - `DIRECTION_FIELDS: Record<string, { min: number; max: number }>`
-  - `buildSystemPrompt(styles: Style[], palettes: Palette[], fontPairs: FontPair[]): string`
+  - `GeneratedDirectionSchema` (zod), `type GeneratedDirection = z.infer<typeof GeneratedDirectionSchema>`
+  - `GENERATED_FIELDS: { name: {min,max}; concept: {min,max}; rationale: {min,max} }`
+  - `buildSystemPrompt(directions: Direction[]): string`
   - `buildUserMessage(brief: Partial<Brief>): string`
+
+Тип ответа модели называется `GeneratedDirection`, а не `Direction`: `Direction` уже занят каталогом направлений из задачи 3. Путать их нельзя — каталог это то, из чего модель выбирает, `GeneratedDirection` это то, что она вернула.
+
+Ключ уровня риска (`safe` / `bold` / `experimental`) берётся из `TIERS` каталога, отдельной константы `DIRECTION_KEYS` не заводим — источник правды один.
 
 - [ ] **Step 1: Написать падающий тест схемы**
 
@@ -1053,43 +1261,59 @@ git commit -m "Суточный лимит: хеш адреса, ключ сут
 
 ```ts
 import { describe, it, expect } from "vitest";
-import { DirectionSchema, DIRECTION_KEYS } from "./directions-schema";
-import { PALETTES, FONT_PAIRS, STYLES } from "./catalog";
+import { GeneratedDirectionSchema } from "./directions-schema";
+import { DIRECTIONS, directionsByTier, TIERS } from "./catalog";
+
+const safe = directionsByTier("safe")[0];
+const bold = directionsByTier("bold")[0];
 
 const valid = {
-  key: "safe",
+  tier: "safe",
+  directionId: safe.id,
   name: "Тихое ремесло",
   concept: "Направление держится на спокойной бумажной палитре и крупной серифной подаче. Оно говорит о ручной работе без деревенских клише.",
   keywords: ["бумага", "ручная работа", "тепло", "спокойствие"],
-  styleId: STYLES[0].id,
-  paletteId: PALETTES[0].id,
-  fontPairId: FONT_PAIRS[0].id,
+  paletteId: safe.paletteIds[0],
+  fontPairId: safe.fontPairIds[0],
   rationale: "Аудитория покупает зерно домой, ей ближе домашняя интонация, а не витрина сетевой кофейни.",
 };
 
-describe("схема направления", () => {
+describe("схема ответа модели", () => {
   it("принимает корректное направление", () => {
-    expect(DirectionSchema.safeParse(valid).success).toBe(true);
+    expect(GeneratedDirectionSchema.safeParse(valid).success).toBe(true);
   });
 
-  it("отвергает ключ вне трёх разрешённых", () => {
-    expect(DirectionSchema.safeParse({ ...valid, key: "safe2" }).success).toBe(false);
+  it("уровни риска берутся из каталога", () => {
+    expect([...TIERS]).toEqual(["safe", "bold", "experimental"]);
   });
 
-  it("отвергает несуществующий id палитры", () => {
-    expect(DirectionSchema.safeParse({ ...valid, paletteId: "нет-такой" }).success).toBe(false);
+  it("отвергает уровень вне трёх разрешённых", () => {
+    expect(GeneratedDirectionSchema.safeParse({ ...valid, tier: "safe2" }).success).toBe(false);
   });
 
-  it("отвергает несуществующий id шрифтовой пары", () => {
-    expect(DirectionSchema.safeParse({ ...valid, fontPairId: "нет-такой" }).success).toBe(false);
+  it("отвергает несуществующее направление", () => {
+    expect(GeneratedDirectionSchema.safeParse({ ...valid, directionId: "нет-такого" }).success).toBe(false);
+  });
+
+  it("отвергает направление не из своего уровня риска", () => {
+    const wrong = { ...valid, tier: "safe", directionId: bold.id };
+    expect(GeneratedDirectionSchema.safeParse(wrong).success).toBe(false);
+  });
+
+  it("отвергает палитру, которой нет у этого направления", () => {
+    const alien = DIRECTIONS.flatMap((d) => d.paletteIds).find((p) => !safe.paletteIds.includes(p));
+    expect(alien).toBeDefined();
+    expect(GeneratedDirectionSchema.safeParse({ ...valid, paletteId: alien! }).success).toBe(false);
+  });
+
+  it("отвергает пару шрифтов, которой нет у этого направления", () => {
+    const alien = DIRECTIONS.flatMap((d) => d.fontPairIds).find((f) => !safe.fontPairIds.includes(f));
+    expect(alien).toBeDefined();
+    expect(GeneratedDirectionSchema.safeParse({ ...valid, fontPairId: alien! }).success).toBe(false);
   });
 
   it("отвергает пустой список ключевых слов", () => {
-    expect(DirectionSchema.safeParse({ ...valid, keywords: [] }).success).toBe(false);
-  });
-
-  it("ключи направлений ровно Safe, Bold, Experimental", () => {
-    expect([...DIRECTION_KEYS]).toEqual(["safe", "bold", "experimental"]);
+    expect(GeneratedDirectionSchema.safeParse({ ...valid, keywords: [] }).success).toBe(false);
   });
 });
 ```
@@ -1105,43 +1329,79 @@ Expected: FAIL, `Cannot find module './directions-schema'`
 
 ```ts
 import { z } from "zod";
-import { STYLES, PALETTES, FONT_PAIRS } from "./catalog";
-
-export const DIRECTION_KEYS = ["safe", "bold", "experimental"] as const;
-export type DirectionKey = (typeof DIRECTION_KEYS)[number];
+import { TIERS, findDirection } from "./catalog";
 
 // Границы длины, из которых собирается промпт. Один источник правды
 // на текст инструкции и на проверку ответа.
-export const DIRECTION_FIELDS = {
+export const GENERATED_FIELDS = {
   name: { min: 3, max: 40 },
   concept: { min: 80, max: 400 },
   rationale: { min: 40, max: 300 },
 } as const;
 
-const styleIds = new Set(STYLES.map((s) => s.id));
-const paletteIds = new Set(PALETTES.map((p) => p.id));
-const fontPairIds = new Set(FONT_PAIRS.map((f) => f.id));
-
 // Идентификаторы проверяются по каталогу, а не по формату строки:
 // модель охотно выдумывает правдоподобные id, которых не существует.
-export const DirectionSchema = z.object({
-  key: z.enum(DIRECTION_KEYS),
-  name: z.string().min(DIRECTION_FIELDS.name.min).max(DIRECTION_FIELDS.name.max),
-  concept: z.string().min(DIRECTION_FIELDS.concept.min).max(DIRECTION_FIELDS.concept.max),
-  keywords: z.array(z.string().min(2).max(30)).min(3).max(6),
-  styleId: z.string().refine((v) => styleIds.has(v), "неизвестный стиль"),
-  paletteId: z.string().refine((v) => paletteIds.has(v), "неизвестная палитра"),
-  fontPairId: z.string().refine((v) => fontPairIds.has(v), "неизвестная пара шрифтов"),
-  rationale: z.string().min(DIRECTION_FIELDS.rationale.min).max(DIRECTION_FIELDS.rationale.max),
-});
+// Палитра и пара шрифтов проверяются не по всему каталогу, а по спискам
+// выбранного направления — иначе к «Швейцарской школе» приедет неоновая
+// палитра, формально существующая.
+export const GeneratedDirectionSchema = z
+  .object({
+    tier: z.enum(TIERS),
+    directionId: z.string(),
+    name: z.string().min(GENERATED_FIELDS.name.min).max(GENERATED_FIELDS.name.max),
+    concept: z.string().min(GENERATED_FIELDS.concept.min).max(GENERATED_FIELDS.concept.max),
+    keywords: z.array(z.string().min(2).max(30)).min(3).max(6),
+    paletteId: z.string(),
+    fontPairId: z.string(),
+    rationale: z
+      .string()
+      .min(GENERATED_FIELDS.rationale.min)
+      .max(GENERATED_FIELDS.rationale.max),
+  })
+  .superRefine((value, ctx) => {
+    const direction = findDirection(value.directionId);
 
-export type Direction = z.infer<typeof DirectionSchema>;
+    if (!direction) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["directionId"],
+        message: "неизвестное направление",
+      });
+      return;
+    }
+
+    if (direction.tier !== value.tier) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["directionId"],
+        message: `направление ${direction.id} относится к уровню ${direction.tier}, а не ${value.tier}`,
+      });
+    }
+
+    if (!direction.paletteIds.includes(value.paletteId)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["paletteId"],
+        message: `палитра ${value.paletteId} не предусмотрена направлением ${direction.id}`,
+      });
+    }
+
+    if (!direction.fontPairIds.includes(value.fontPairId)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["fontPairId"],
+        message: `пара шрифтов ${value.fontPairId} не предусмотрена направлением ${direction.id}`,
+      });
+    }
+  });
+
+export type GeneratedDirection = z.infer<typeof GeneratedDirectionSchema>;
 ```
 
 - [ ] **Step 4: Прогнать тест схемы**
 
 Run: `npm test -- directions-schema`
-Expected: PASS, все шесть проверок.
+Expected: PASS, все восемь проверок.
 
 - [ ] **Step 5: Написать падающий тест промпта**
 
@@ -1150,35 +1410,37 @@ Expected: PASS, все шесть проверок.
 ```ts
 import { describe, it, expect } from "vitest";
 import { buildSystemPrompt, buildUserMessage } from "./prompt";
-import { DIRECTION_FIELDS } from "./directions-schema";
-import { STYLES, PALETTES, FONT_PAIRS } from "./catalog";
+import { GENERATED_FIELDS } from "./directions-schema";
+import { DIRECTIONS, directionsByTier } from "./catalog";
 
-const prompt = buildSystemPrompt(STYLES.slice(0, 3), PALETTES.slice(0, 5), FONT_PAIRS.slice(0, 4));
+const prompt = buildSystemPrompt(DIRECTIONS);
 
 describe("системный промпт", () => {
-  it("называет все три направления", () => {
-    for (const key of ["safe", "bold", "experimental"]) expect(prompt).toContain(key);
+  it("называет все три уровня риска", () => {
+    for (const tier of ["safe", "bold", "experimental"]) expect(prompt).toContain(tier);
   });
 
   it("границы длины берутся из схемы, а не вписаны руками", () => {
-    expect(prompt).toContain(String(DIRECTION_FIELDS.concept.max));
-    expect(prompt).toContain(String(DIRECTION_FIELDS.rationale.min));
+    expect(prompt).toContain(String(GENERATED_FIELDS.concept.max));
+    expect(prompt).toContain(String(GENERATED_FIELDS.rationale.min));
   });
 
-  it("перечисляет переданные id каталога", () => {
-    expect(prompt).toContain(PALETTES[0].id);
-    expect(prompt).toContain(FONT_PAIRS[0].id);
-    expect(prompt).toContain(STYLES[0].id);
+  it("перечисляет каждое переданное направление с его палитрами и шрифтами", () => {
+    for (const d of DIRECTIONS) {
+      expect(prompt, d.id).toContain(d.id);
+      expect(prompt, d.id).toContain(d.paletteIds[0]);
+      expect(prompt, d.id).toContain(d.fontPairIds[0]);
+    }
   });
 
-  it("не перечисляет палитры, которых не передавали", () => {
-    const omitted = PALETTES.slice(5).find((p) => !PALETTES.slice(0, 5).some((x) => x.id === p.id));
-    expect(omitted).toBeDefined();
-    expect(prompt).not.toContain(omitted!.id);
+  it("не перечисляет направления, которых не передавали", () => {
+    const only = directionsByTier("safe");
+    const narrow = buildSystemPrompt(only);
+    const omitted = DIRECTIONS.find((d) => d.tier !== "safe")!;
+    expect(narrow).not.toContain(omitted.id);
   });
 
   it("запрещает длинные тире", () => {
-    expect(prompt).toContain("—");
     expect(prompt.toLowerCase()).toContain("тире");
   });
 });
@@ -1207,68 +1469,62 @@ Expected: FAIL, `Cannot find module './prompt'`
 Создать `lib/prompt.ts`:
 
 ```ts
-import { DIRECTION_FIELDS, DIRECTION_KEYS } from "./directions-schema";
+import { GENERATED_FIELDS } from "./directions-schema";
 import { BRIEF_FIELDS, type Brief } from "./brief-schema";
-import type { Style, Palette, FontPair } from "./catalog";
+import { TIERS, type Direction, type Tier } from "./catalog";
 
 // Промпт собирается из схемы и из переданного среза каталога.
 // Числа не вписываются руками: иначе текст инструкции разъезжается
 // с проверкой ответа, и разъезд ловится только на бою.
-const skeleton = DIRECTION_KEYS.map(
-  (key) =>
-    `{"section":"direction","data":{"key":"${key}","name":"...","concept":"...",` +
-    `"keywords":["..."],"styleId":"...","paletteId":"...","fontPairId":"...","rationale":"..."}}`
+const SKELETON = TIERS.map(
+  (tier) =>
+    `{"section":"direction","data":{"tier":"${tier}","directionId":"...","name":"...","concept":"...",` +
+    `"keywords":["..."],"paletteId":"...","fontPairId":"...","rationale":"..."}}`
 ).join("\n");
 
-export function buildSystemPrompt(
-  styles: Style[],
-  palettes: Palette[],
-  fontPairs: FontPair[]
-): string {
-  const styleList = styles
-    .map((s) => `- ${s.id}: ${s.keywords.join(", ")}. Годится для: ${s.bestFor}`)
-    .join("\n");
+const TIER_MEANING: Record<Tier, string> = {
+  safe: "проверенное решение, которое точно не подведёт. Узнаваемое, спокойное.",
+  bold: "заметное решение с характером. Рискует ради того, чтобы запомниться.",
+  experimental: "решение на грани. Может подойти не всем, но задаёт свой язык.",
+};
 
-  const paletteList = palettes
-    .map((p) => `- ${p.id}: основной ${p.primary}, акцент ${p.accent}, фон ${p.background}`)
-    .join("\n");
+function describe(direction: Direction): string {
+  return [
+    `- ${direction.id} — ${direction.name}`,
+    `  визуальный язык: ${direction.language}`,
+    `  ключевые слова: ${direction.keywords.join(", ")}`,
+    `  допустимые палитры: ${direction.paletteIds.join(", ")}`,
+    `  допустимые пары шрифтов: ${direction.fontPairIds.join(", ")}`,
+  ].join("\n");
+}
 
-  const fontList = fontPairs
-    .map((f) => `- ${f.id}: ${f.heading} для заголовков, ${f.body} для текста (${f.mood.join(", ")})`)
-    .join("\n");
+export function buildSystemPrompt(directions: Direction[]): string {
+  const catalogue = TIERS.map((tier) => {
+    const forTier = directions.filter((d) => d.tier === tier);
+    if (forTier.length === 0) return "";
+    return `Уровень ${tier} — ${TIER_MEANING[tier]}\n${forTier.map(describe).join("\n")}`;
+  })
+    .filter(Boolean)
+    .join("\n\n");
 
   return `Ты арт-директор. По брифу о бренде предлагаешь три визуальных направления.
 
 Отвечай СТРОГО построчным JSON: одна строка — один объект, без markdown, без пояснений.
 Три строки, ровно в этом порядке:
 
-${skeleton}
+${SKELETON}
 
-Что означают ключи направлений:
-— safe: проверенное решение, которое точно не подведёт. Узнаваемое, спокойное.
-— bold: заметное решение с характером. Рискует ради того, чтобы запомниться.
-— experimental: решение на грани. Может не подойти всем, но задаёт свой язык.
+Выбирай ТОЛЬКО из этого каталога. Для каждого уровня риска возьми ровно одно
+направление своего уровня. Палитру и пару шрифтов бери из списков выбранного
+направления. Идентификаторов вне этих списков не существует, выдумывать их нельзя.
 
-Три направления должны различаться по существу, а не подбором синонимов.
-Если safe и bold опираются на одну палитру и одну пару шрифтов — переделай.
-
-Выбирай ТОЛЬКО из этих списков. Идентификаторов вне списков не существует,
-выдумывать их нельзя.
-
-Стили:
-${styleList}
-
-Палитры:
-${paletteList}
-
-Пары шрифтов:
-${fontList}
+${catalogue}
 
 Правила текста:
 — Только русский язык, независимо от языка брифа.
-— name — ${DIRECTION_FIELDS.name.min}–${DIRECTION_FIELDS.name.max} знаков, живое название направления, а не ярлык «Вариант 1».
-— concept — ${DIRECTION_FIELDS.concept.min}–${DIRECTION_FIELDS.concept.max} знаков: как направление выглядит и что оно говорит о бренде.
-— rationale — ${DIRECTION_FIELDS.rationale.min}–${DIRECTION_FIELDS.rationale.max} знаков: почему это подходит именно этому бренду и его аудитории.
+— name — ${GENERATED_FIELDS.name.min}–${GENERATED_FIELDS.name.max} знаков, живое название направления для этого конкретного бренда, а не название стиля из каталога и не ярлык «Вариант 1».
+— concept — ${GENERATED_FIELDS.concept.min}–${GENERATED_FIELDS.concept.max} знаков: как направление выглядит и что оно говорит о бренде.
+— rationale — ${GENERATED_FIELDS.rationale.min}–${GENERATED_FIELDS.rationale.max} знаков: почему это подходит именно этому бренду и его аудитории.
 — keywords — от 3 до 6 слов, по-русски, конкретных. «Современно» и «стильно» не годятся.
 — Опирайся на то, что человек рассказал. Не придумывай фактов о бренде:
   ни города, ни года основания, ни числа сотрудников, ни цен.
@@ -1304,13 +1560,13 @@ export function buildUserMessage(brief: Partial<Brief>): string {
 - [ ] **Step 8: Прогнать тесты**
 
 Run: `npm test -- prompt directions-schema`
-Expected: PASS, тринадцать проверок.
+Expected: PASS, пятнадцать проверок.
 
 - [ ] **Step 9: Коммит**
 
 ```bash
 git add lib/directions-schema.ts lib/directions-schema.test.ts lib/prompt.ts lib/prompt.test.ts
-git commit -m "Схема трёх направлений и промпт, собранный из схемы и каталога"
+git commit -m "Схема ответа модели с проверкой по каталогу направлений и промпт"
 ```
 
 ---
@@ -1391,8 +1647,8 @@ Expected: FAIL, `Cannot find module './route'`
 import { BriefSchema, stripEmpty } from "@/lib/brief-schema";
 import { buildSystemPrompt, buildUserMessage } from "@/lib/prompt";
 import { parseSSEBuffer, parseSectionBuffer } from "@/lib/stream";
-import { STYLES, PALETTES, FONT_PAIRS } from "@/lib/catalog";
-import { stylesForChips } from "@/lib/vocab";
+import { DIRECTIONS, TIERS } from "@/lib/catalog";
+import { directionsForChips } from "@/lib/vocab";
 import { extractIp, ipHash, isOverLimit, limitKey } from "@/lib/rate-limit";
 import { redis, DAY_SECONDS } from "@/lib/redis";
 
@@ -1402,10 +1658,9 @@ export const maxDuration = 60;
 const ENDPOINT = "https://polza.ai/api/v1/chat/completions";
 const MODEL = "anthropic/claude-sonnet-5";
 
-// Сколько строк каталога уезжает в промпт, когда человек не выбрал чипы.
-// Весь каталог не отправляем: он в разы дороже самого брифа.
-const FALLBACK_STYLES = 12;
-const PROMPT_PALETTES = 24;
+// Направлений всего девять, они дешёвые и уезжают в промпт целиком.
+// Палитры и шрифты перечисляет каждое направление само, отдельным
+// списком их слать не нужно.
 
 export async function POST(req: Request) {
   let rawBody: unknown;
@@ -1458,10 +1713,18 @@ export async function POST(req: Request) {
     );
   }
 
-  // Чипы человека сужают каталог. Ничего не выбрал — даём срез по умолчанию.
+  // Чипы человека сужают каталог. Ничего не выбрал — отдаём все девять:
+  // модель всё равно обязана взять по одному направлению на каждый уровень.
   const chips = [...(brief.characterChips ?? []), ...(brief.aestheticChips ?? [])];
-  const chosen = stylesForChips(chips);
-  const styles = chosen.length ? chosen : STYLES.slice(0, FALLBACK_STYLES);
+  const chosen = directionsForChips(chips);
+
+  // Каждый уровень риска должен остаться представленным, иначе модели
+  // будет нечего выбрать под Bold или Experimental. Чипы этого не
+  // гарантируют, поэтому недостающие уровни добираем из полного каталога.
+  const directions = TIERS.flatMap((tier) => {
+    const picked = chosen.filter((d) => d.tier === tier);
+    return picked.length ? picked : DIRECTIONS.filter((d) => d.tier === tier);
+  });
 
   const upstream = await fetch(ENDPOINT, {
     method: "POST",
@@ -1479,7 +1742,7 @@ export async function POST(req: Request) {
       messages: [
         {
           role: "system",
-          content: buildSystemPrompt(styles, PALETTES.slice(0, PROMPT_PALETTES), FONT_PAIRS),
+          content: buildSystemPrompt(directions),
         },
         { role: "user", content: buildUserMessage(brief) },
       ],
@@ -1602,10 +1865,10 @@ git commit -m "Route handler: валидация, суточный лимит, �
 - Test: `lib/directions-state.test.ts`
 
 **Interfaces:**
-- Consumes: `Direction`, `DirectionSchema`, `DIRECTION_KEYS` из `@/lib/directions-schema`; `SectionChunk` из `@/lib/stream`
+- Consumes: `GeneratedDirection`, `GeneratedDirectionSchema` из `@/lib/directions-schema`; `TIERS` из `@/lib/catalog`; `SectionChunk` из `@/lib/stream`
 - Produces:
-  - `accumulate(current: Direction[], chunks: SectionChunk[]): Direction[]`
-  - `isComplete(directions: Direction[]): boolean`
+  - `accumulate(current: GeneratedDirection[], chunks: SectionChunk[]): GeneratedDirection[]`
+  - `isComplete(directions: GeneratedDirection[]): boolean`
 
 - [ ] **Step 1: Написать падающий тест**
 
@@ -1614,21 +1877,26 @@ git commit -m "Route handler: валидация, суточный лимит, �
 ```ts
 import { describe, it, expect } from "vitest";
 import { accumulate, isComplete } from "./directions-state";
-import { STYLES, PALETTES, FONT_PAIRS } from "./catalog";
+import { directionsByTier, type Tier } from "./catalog";
 
-const make = (key: string) => ({
-  section: "direction",
-  data: {
-    key,
-    name: "Название",
-    concept: "к".repeat(100),
-    keywords: ["раз", "два", "три"],
-    styleId: STYLES[0].id,
-    paletteId: PALETTES[0].id,
-    fontPairId: FONT_PAIRS[0].id,
-    rationale: "р".repeat(50),
-  },
-});
+// Направление берётся из своего уровня вместе с его же палитрой и парой
+// шрифтов: схема проверяет согласованность, случайные id её не пройдут.
+const make = (tier: Tier) => {
+  const direction = directionsByTier(tier)[0];
+  return {
+    section: "direction",
+    data: {
+      tier,
+      directionId: direction.id,
+      name: "Название",
+      concept: "к".repeat(100),
+      keywords: ["раз", "два", "три"],
+      paletteId: direction.paletteIds[0],
+      fontPairId: direction.fontPairIds[0],
+      rationale: "р".repeat(50),
+    },
+  };
+};
 
 describe("накопление направлений", () => {
   it("из трёх кусков собирает три направления", () => {
@@ -1645,14 +1913,20 @@ describe("накопление направлений", () => {
     expect(isComplete(state)).toBe(true);
   });
 
-  it("повтор того же ключа перезаписывает, а не удваивает", () => {
+  it("повтор того же уровня перезаписывает, а не удваивает", () => {
     const state = accumulate([], [make("safe"), make("safe")]);
     expect(state).toHaveLength(1);
   });
 
   it("направление, не прошедшее схему, молча отбрасывается", () => {
-    const broken = { section: "direction", data: { key: "safe", name: "х" } };
+    const broken = { section: "direction", data: { tier: "safe", name: "х" } };
     expect(accumulate([], [broken])).toHaveLength(0);
+  });
+
+  it("направление не из своего уровня отбрасывается", () => {
+    const mismatched = { ...make("safe") };
+    mismatched.data.directionId = directionsByTier("bold")[0].id;
+    expect(accumulate([], [mismatched])).toHaveLength(0);
   });
 
   it("кусок с неизвестной секцией отбрасывается", () => {
@@ -1661,7 +1935,7 @@ describe("накопление направлений", () => {
 
   it("порядок всегда safe, bold, experimental, независимо от прихода", () => {
     const result = accumulate([], [make("experimental"), make("safe"), make("bold")]);
-    expect(result.map((d) => d.key)).toEqual(["safe", "bold", "experimental"]);
+    expect(result.map((d) => d.tier)).toEqual(["safe", "bold", "experimental"]);
   });
 });
 ```
@@ -1676,7 +1950,8 @@ Expected: FAIL, `Cannot find module './directions-state'`
 Создать `lib/directions-state.ts`:
 
 ```ts
-import { DirectionSchema, DIRECTION_KEYS, type Direction } from "./directions-schema";
+import { GeneratedDirectionSchema, type GeneratedDirection } from "./directions-schema";
+import { TIERS } from "./catalog";
 import type { SectionChunk } from "./stream";
 
 /**
@@ -1685,25 +1960,28 @@ import type { SectionChunk } from "./stream";
  * в потоке, а не рабочий сценарий. Повтор того же ключа перезаписывает
  * прежнее значение — последняя строка в потоке побеждает.
  */
-export function accumulate(current: Direction[], chunks: SectionChunk[]): Direction[] {
-  const byKey = new Map(current.map((d) => [d.key, d]));
+export function accumulate(
+  current: GeneratedDirection[],
+  chunks: SectionChunk[]
+): GeneratedDirection[] {
+  const byTier = new Map(current.map((d) => [d.tier, d]));
 
   for (const { section, data } of chunks) {
     if (section !== "direction") continue;
-    const parsed = DirectionSchema.safeParse(data);
-    if (parsed.success) byKey.set(parsed.data.key, parsed.data);
+    const parsed = GeneratedDirectionSchema.safeParse(data);
+    if (parsed.success) byTier.set(parsed.data.tier, parsed.data);
   }
 
   // Порядок задаём мы, а не апстрим: карточки не должны прыгать местами
   // от того, в каком порядке модель их дописала.
-  return DIRECTION_KEYS.map((key) => byKey.get(key)).filter(
-    (d): d is Direction => d !== undefined
+  return TIERS.map((tier) => byTier.get(tier)).filter(
+    (d): d is GeneratedDirection => d !== undefined
   );
 }
 
 /** Готово, когда пришли все три направления. */
-export function isComplete(directions: Direction[]): boolean {
-  return directions.length === DIRECTION_KEYS.length;
+export function isComplete(directions: GeneratedDirection[]): boolean {
+  return directions.length === TIERS.length;
 }
 ```
 
@@ -1930,11 +2208,11 @@ git commit -m "Форма брифа: поля, чипы, индикатор п�
 - Modify: `app/page.tsx`
 
 **Interfaces:**
-- Consumes: `parseSectionBuffer` из `@/lib/stream`; `accumulate`, `isComplete` из `@/lib/directions-state`; `Direction` из `@/lib/directions-schema`; `findPalette`, `findFontPair` из `@/lib/catalog`
+- Consumes: `parseSectionBuffer` из `@/lib/stream`; `accumulate`, `isComplete` из `@/lib/directions-state`; `GeneratedDirection` из `@/lib/directions-schema`; `findDirection`, `findPalette`, `findFontPair` из `@/lib/catalog`
 - Produces:
-  - `useDirections(): { start(brief: Partial<Brief>): Promise<void>; reset(): void; directions: Direction[]; status: "idle" | "streaming" | "done" | "error"; error: string | null }`
+  - `useDirections(): { start(brief: Partial<Brief>): Promise<void>; reset(): void; directions: GeneratedDirection[]; status: "idle" | "streaming" | "done" | "error"; error: string | null }`
   - `<BriefSummary brief={Partial<Brief>} onEdit={() => void} />`
-  - `<DirectionCard direction={Direction} />`
+  - `<DirectionCard direction={GeneratedDirection} />`
 
 - [ ] **Step 1: Хук чтения потока**
 
@@ -1945,7 +2223,7 @@ git commit -m "Форма брифа: поля, чипы, индикатор п�
 
 import { useState } from "react";
 import type { Brief } from "@/lib/brief-schema";
-import type { Direction } from "@/lib/directions-schema";
+import type { GeneratedDirection } from "@/lib/directions-schema";
 import { parseSectionBuffer } from "@/lib/stream";
 import { accumulate, isComplete } from "@/lib/directions-state";
 
@@ -1958,7 +2236,7 @@ const GENERIC = "Не удалось собрать направления. По
  * Разбор потока живёт в lib/stream.ts, накопление — в lib/directions-state.ts.
  */
 export function useDirections() {
-  const [directions, setDirections] = useState<Direction[]>([]);
+  const [directions, setDirections] = useState<GeneratedDirection[]>([]);
   const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState<string | null>(null);
 
@@ -1990,7 +2268,7 @@ export function useDirections() {
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
     let buffer = "";
-    let current: Direction[] = [];
+    let current: GeneratedDirection[] = [];
 
     try {
       while (true) {
@@ -2037,7 +2315,7 @@ export function useDirections() {
 
 - [ ] **Step 3: Карточка направления**
 
-Создать `components/directions/DirectionCard.tsx`. Показывает `name`, `concept`, `keywords`, полоску палитры и образец пары шрифтов. Цвета берутся из `findPalette(direction.paletteId)`, шрифты из `findFontPair(direction.fontPairId)` и применяются inline-стилем внутри карточки — наружу палитра не протекает.
+Создать `components/directions/DirectionCard.tsx`. Показывает `name`, `concept`, `keywords`, полоску палитры и образец пары шрифтов. Цвета берутся из `findPalette(direction.paletteId)`, шрифты из `findFontPair(direction.fontPairId)` и применяются inline-стилем внутри карточки — наружу палитра не протекает. Уровень риска (`direction.tier`) выводится подписью Safe / Bold / Experimental, название направления из каталога — через `findDirection(direction.directionId)?.name`.
 
 Перед вёрсткой вызвать `frontend-design`. После сборки карточки вызвать `/break` и проверить состояния: почти белая палитра, почти чёрная, монохром, имя направления в 40 знаков без пробелов, `concept` на верхней границе в 400 знаков, шесть длинных ключевых слов.
 
@@ -2078,9 +2356,9 @@ git commit -m "Стрим направлений на клиенте и сбор
 - Test: `lib/fixtures/fixtures.test.ts`
 
 **Interfaces:**
-- Consumes: `Direction`, `DirectionSchema` из `@/lib/directions-schema`; `Brief` из `@/lib/brief-schema`
+- Consumes: `GeneratedDirection`, `GeneratedDirectionSchema` из `@/lib/directions-schema`; `Brief` из `@/lib/brief-schema`
 - Produces:
-  - `interface Showcase { slug: string; title: string; brief: Brief; directions: Direction[] }`
+  - `interface Showcase { slug: string; title: string; brief: Brief; directions: GeneratedDirection[] }`
   - `SHOWCASES: Showcase[]`, `findShowcase(slug: string): Showcase | undefined`
 
 Маршрут витрины появится в следующем срезе — ему нужна вёрстка брендборда. Здесь фиксируется формат и проверяется, что фикстуры проходят схему.
@@ -2092,7 +2370,7 @@ git commit -m "Стрим направлений на клиенте и сбор
 ```ts
 import { describe, it, expect } from "vitest";
 import { SHOWCASES, findShowcase } from "./index";
-import { DirectionSchema } from "@/lib/directions-schema";
+import { GeneratedDirectionSchema } from "@/lib/directions-schema";
 import { BriefSchema } from "@/lib/brief-schema";
 
 describe("фикстуры витрины", () => {
@@ -2115,7 +2393,7 @@ describe("фикстуры витрины", () => {
     for (const s of SHOWCASES) {
       expect(s.directions).toHaveLength(3);
       for (const d of s.directions) {
-        expect(DirectionSchema.safeParse(d).success, `${s.slug}/${d.key}`).toBe(true);
+        expect(GeneratedDirectionSchema.safeParse(d).success, `${s.slug}/${d.tier}`).toBe(true);
       }
     }
   });
@@ -2158,7 +2436,7 @@ export const zerno: Showcase = {
     avoid: "Без деревенской избы и мешковины",
   },
   directions: [
-    // Три объекта, скопированных из ответа модели, ключи safe / bold / experimental.
+    // Три объекта, скопированных из ответа модели, уровни safe / bold / experimental.
   ],
 };
 ```
@@ -2169,7 +2447,7 @@ export const zerno: Showcase = {
 
 ```ts
 import type { Brief } from "@/lib/brief-schema";
-import type { Direction } from "@/lib/directions-schema";
+import type { GeneratedDirection } from "@/lib/directions-schema";
 import { zerno } from "./zerno";
 import { klinika } from "./klinika";
 import { krossovki } from "./krossovki";
@@ -2178,7 +2456,7 @@ export interface Showcase {
   slug: string;
   title: string;
   brief: Brief;
-  directions: Direction[];
+  directions: GeneratedDirection[];
 }
 
 export const SHOWCASES: Showcase[] = [zerno, klinika, krossovki];
