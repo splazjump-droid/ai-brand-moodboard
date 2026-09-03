@@ -23,3 +23,9 @@ npm-debug.log*
 
 # локальные копии планов и спек для правки руками
 tmp/
+
+# Vercel
+.vercel
+
+# TypeScript
+*.tsbuildinfo
