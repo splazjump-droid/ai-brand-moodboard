@@ -32,4 +32,9 @@ describe("stripEmpty", () => {
     const full = { ...valid, audience: "домашние бариста", characterChips: ["warm"] };
     expect(stripEmpty(full)).toEqual(full);
   });
+
+  it("срезает пробелы по краям у выживших строк", () => {
+    const result = stripEmpty({ ...valid, audience: "  домашние бариста  " });
+    expect(result.audience).toBe("домашние бариста");
+  });
 });

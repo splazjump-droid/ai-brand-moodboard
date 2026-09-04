@@ -1,7 +1,8 @@
 import { z } from "zod";
 
-// Границы длины живут здесь и только здесь: из них собирается промпт
-// и по ним валидируется вход. Иначе промпт разъезжается со схемой.
+// Границы длины текстовых полей живут здесь и только здесь: из них
+// собирается промпт и по ним валидируется вход. Иначе промпт разъезжается
+// со схемой.
 export const BRIEF_FIELDS = {
   brand: { min: 10, max: 600, label: "Что за бренд" },
   audience: { min: 0, max: 300, label: "Для кого" },
@@ -10,12 +11,20 @@ export const BRIEF_FIELDS = {
   avoid: { min: 0, max: 300, label: "Чего избегать" },
 } as const;
 
+/**
+ * Больше восьми чипов на группу человек не выберет осмысленно, а лишние
+ * только размывают запрос к модели. Ограничение на количество, а не на
+ * длину, поэтому живёт отдельно от BRIEF_FIELDS: тот описывает границы
+ * длины текстовых полей и целиком уходит в текст промпта.
+ */
+export const MAX_CHIPS = 8;
+
 export const BriefSchema = z.object({
   brand: z.string().min(BRIEF_FIELDS.brand.min).max(BRIEF_FIELDS.brand.max),
   audience: z.string().max(BRIEF_FIELDS.audience.max).optional(),
-  characterChips: z.array(z.string()).max(8).optional(),
+  characterChips: z.array(z.string()).max(MAX_CHIPS).optional(),
   characterFree: z.string().max(BRIEF_FIELDS.characterFree.max).optional(),
-  aestheticChips: z.array(z.string()).max(8).optional(),
+  aestheticChips: z.array(z.string()).max(MAX_CHIPS).optional(),
   aestheticFree: z.string().max(BRIEF_FIELDS.aestheticFree.max).optional(),
   avoid: z.string().max(BRIEF_FIELDS.avoid.max).optional(),
 });
