@@ -1,7 +1,7 @@
 import { BriefSchema, stripEmpty } from "@/lib/brief-schema";
 import { buildSystemPrompt, buildUserMessage } from "@/lib/prompt";
 import { parseSSEBuffer, parseSectionBuffer } from "@/lib/stream";
-import { DIRECTIONS, TIERS } from "@/lib/catalog";
+import { directionsByTier, TIERS } from "@/lib/catalog";
 import { directionsForChips } from "@/lib/vocab";
 import { extractIp, ipHash, isOverLimit, limitKey } from "@/lib/rate-limit";
 import { redis, DAY_SECONDS } from "@/lib/redis";
@@ -10,7 +10,7 @@ export const runtime = "nodejs";
 export const maxDuration = 60;
 
 const ENDPOINT = "https://polza.ai/api/v1/chat/completions";
-const MODEL = "anthropic/claude-sonnet-5";
+const MODEL = "anthropic/claude-opus-5";
 
 // Направлений всего девять, они дешёвые и уезжают в промпт целиком.
 // Палитры и шрифты перечисляет каждое направление само, отдельным
@@ -72,10 +72,15 @@ export async function POST(req: Request) {
     count = await redis.incr(key);
     if (count === 1) await redis.expire(key, DAY_SECONDS);
   } catch {
+    // Без значений, ключа и адреса: в лог уходит только сам факт отказа,
+    // иначе молча отключившийся лимит не заметить до счёта за токены.
+    console.error("[directions] хранилище лимита недоступно, проход не учтён");
     count = 0;
   }
 
-  if (isOverLimit(count)) {
+  // incr считает вместе с текущим запросом (первый проход даёт 1),
+  // а isOverLimit ждёт число уже израсходованных проходов — отсюда −1.
+  if (isOverLimit(count - 1)) {
     return Response.json(
       { error: "На сегодня хватит. Лимит снимется через сутки после первой сборки." },
       { status: 429 }
@@ -92,7 +97,7 @@ export async function POST(req: Request) {
   // гарантируют, поэтому недостающие уровни добираем из полного каталога.
   const directions = TIERS.flatMap((tier) => {
     const picked = chosen.filter((d) => d.tier === tier);
-    return picked.length ? picked : DIRECTIONS.filter((d) => d.tier === tier);
+    return picked.length ? picked : directionsByTier(tier);
   });
 
   const upstream = await fetch(ENDPOINT, {
@@ -122,6 +127,8 @@ export async function POST(req: Request) {
   });
 
   if (!upstream.ok || !upstream.body) {
+    // Только статус: тело ответа апстрима может содержать эхо ключа.
+    console.error(`[directions] апстрим ответил ${upstream.status}`);
     return Response.json(
       { error: "Не удалось собрать направления. Попробуйте ещё раз." },
       { status: 502 }
@@ -188,7 +195,13 @@ export async function POST(req: Request) {
           controller.close();
         }
       } catch (error) {
-        if (!cancelled) controller.error(error);
+        // Бросить мог сам close или enqueue — тогда контроллер уже мёртв
+        // и error на нём бросит второй раз, уже из start().
+        if (!cancelled) {
+          try {
+            controller.error(error);
+          } catch {}
+        }
       } finally {
         reader.releaseLock();
       }

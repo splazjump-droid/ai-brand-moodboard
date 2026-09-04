@@ -16,10 +16,52 @@ const post = async (body: unknown) => {
   );
 };
 
+/**
+ * Поток апстрима с тремя направлениями. Последний кадр SSE не закрыт
+ * переводом строки, и внутри него последняя строка построчного JSON —
+ * тоже: ровно так обрывается настоящий ответ. Оба хвоста должны быть
+ * дочитаны после цикла, иначе третье направление теряется.
+ */
+function sseStream(): ReadableStream<Uint8Array> {
+  const frame = (content: string) =>
+    `data: ${JSON.stringify({ choices: [{ delta: { content } }] })}`;
+
+  const body =
+    `${frame('{"section":"direction","data":{"id":"safe"}}\n')}\n\n` +
+    `${frame('{"section":"direction","data":{"id":"bold"}}\n')}\n\n` +
+    // Ни "\n\n" после кадра, ни "\n" после самого JSON.
+    frame('{"section":"direction","data":{"id":"experimental"}}');
+
+  const encoder = new TextEncoder();
+  // Режем на куски мимо границ строк — так же, как приходит из сети.
+  const parts = [body.slice(0, 40), body.slice(40, 150), body.slice(150)];
+
+  return new ReadableStream({
+    start(controller) {
+      for (const part of parts) controller.enqueue(encoder.encode(part));
+      controller.close();
+    },
+  });
+}
+
+async function readSections(res: Response) {
+  const text = await res.text();
+  return text
+    .split("\n")
+    .filter((line) => line.trim())
+    .map((line) => JSON.parse(line) as { section: string; data: unknown });
+}
+
 beforeEach(() => {
   process.env.APP_SALT = "тестовая-соль";
   process.env.POLZA_API_KEY = "тестовый-ключ";
   vi.resetModules();
+  // Сеть закрыта по умолчанию: если проверка выше по файлу сломается,
+  // тест упадёт здесь, а не уйдёт живым запросом на polza.ai с ключом
+  // из окружения.
+  global.fetch = vi.fn(() => {
+    throw new Error("fetch в тестах запрещён");
+  });
 });
 
 describe("POST /api/directions", () => {
@@ -54,5 +96,21 @@ describe("POST /api/directions", () => {
     delete process.env.POLZA_API_KEY;
     const res = await post({ brand: "уютная кофейня в центре города" });
     expect(res.status).toBe(500);
+  });
+
+  it("дочитывает хвост: поток без завершающего перевода строки отдаёт все три направления", async () => {
+    global.fetch = vi.fn().mockResolvedValue(
+      new Response(sseStream(), { status: 200, headers: { "content-type": "text/event-stream" } })
+    );
+
+    const res = await post({ brand: "уютная кофейня в центре города" });
+    expect(res.status).toBe(200);
+
+    const sections = await readSections(res);
+    expect(sections.map((s) => (s.data as { id: string }).id)).toEqual([
+      "safe",
+      "bold",
+      "experimental",
+    ]);
   });
 });
