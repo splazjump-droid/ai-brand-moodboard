@@ -1,4 +1,4 @@
-import { GENERATED_FIELDS } from "./directions-schema";
+import { GENERATED_FIELDS, KEYWORDS } from "./directions-schema";
 import { BRIEF_FIELDS, type Brief } from "./brief-schema";
 import { TIERS, type Direction, type Tier } from "./catalog";
 
@@ -54,7 +54,7 @@ ${catalogue}
 — name — ${GENERATED_FIELDS.name.min}–${GENERATED_FIELDS.name.max} знаков, живое название направления для этого конкретного бренда, а не название стиля из каталога и не ярлык «Вариант 1».
 — concept — ${GENERATED_FIELDS.concept.min}–${GENERATED_FIELDS.concept.max} знаков: как направление выглядит и что оно говорит о бренде.
 — rationale — ${GENERATED_FIELDS.rationale.min}–${GENERATED_FIELDS.rationale.max} знаков: почему это подходит именно этому бренду и его аудитории.
-— keywords — от 3 до 6 слов, по-русски, конкретных. «Современно» и «стильно» не годятся.
+— keywords — от ${KEYWORDS.min} до ${KEYWORDS.max} слов длиной от ${KEYWORDS.wordMin} до ${KEYWORDS.wordMax} знаков каждое, по-русски, конкретных. «Современно» и «стильно» не годятся.
 — Опирайся на то, что человек рассказал. Не придумывай фактов о бренде:
   ни города, ни года основания, ни числа сотрудников, ни цен.
 — Если человек указал, чего избегать, — это запрет, а не пожелание.
@@ -75,9 +75,12 @@ const LABELS: Record<string, string> = {
   avoid: BRIEF_FIELDS.avoid.label,
 };
 
-/** Бриф человеку понятным текстом. Пустые поля сюда не доходят. */
+/** Бриф человеку понятным текстом. Пустые поля отсекает сама функция. */
 export function buildUserMessage(brief: Partial<Brief>): string {
   return Object.entries(brief)
+    .filter(([, value]) =>
+      Array.isArray(value) ? value.length > 0 : typeof value === "string" && value.trim().length > 0
+    )
     .map(([key, value]) => {
       const text = Array.isArray(value) ? value.join(", ") : value;
       return `${LABELS[key] ?? key}: ${text}`;

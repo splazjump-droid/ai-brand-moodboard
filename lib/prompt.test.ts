@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { buildSystemPrompt, buildUserMessage } from "./prompt";
-import { GENERATED_FIELDS } from "./directions-schema";
+import { GENERATED_FIELDS, KEYWORDS } from "./directions-schema";
 import { DIRECTIONS, directionsByTier } from "./catalog";
 
 const prompt = buildSystemPrompt(DIRECTIONS);
@@ -13,6 +13,13 @@ describe("системный промпт", () => {
   it("границы длины берутся из схемы, а не вписаны руками", () => {
     expect(prompt).toContain(String(GENERATED_FIELDS.concept.max));
     expect(prompt).toContain(String(GENERATED_FIELDS.rationale.min));
+  });
+
+  it("границы keywords берутся из схемы, а не вписаны руками", () => {
+    expect(prompt).toContain(String(KEYWORDS.min));
+    expect(prompt).toContain(String(KEYWORDS.max));
+    expect(prompt).toContain(String(KEYWORDS.wordMin));
+    expect(prompt).toContain(String(KEYWORDS.wordMax));
   });
 
   it("перечисляет каждое переданное направление с его палитрами и шрифтами", () => {
@@ -39,11 +46,11 @@ describe("сообщение пользователя", () => {
   it("не включает пустые поля", () => {
     const msg = buildUserMessage({ brand: "Кофейня «Зерно»", audience: "" });
     expect(msg).toContain("Кофейня «Зерно»");
-    expect(msg).not.toContain("audience");
+    expect(msg).not.toContain("Для кого");
   });
 
   it("подписывает поля по-русски", () => {
     const msg = buildUserMessage({ brand: "Кофейня «Зерно»", avoid: "без мешковины" });
-    expect(msg).toContain("без мешковины");
+    expect(msg).toContain("Чего избегать: без мешковины");
   });
 });

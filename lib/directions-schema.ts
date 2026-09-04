@@ -9,6 +9,14 @@ export const GENERATED_FIELDS = {
   rationale: { min: 40, max: 300 },
 } as const;
 
+/**
+ * Ключевые слова описываются двумя разными мерами: сколько их и какой
+ * длины каждое. В GENERATED_FIELDS не помещаются — там границы длины
+ * текстовых полей в знаках. Но источник всё равно должен быть один:
+ * схема проверяет по этим числам, промпт из них же собирает инструкцию.
+ */
+export const KEYWORDS = { min: 3, max: 6, wordMin: 2, wordMax: 30 } as const;
+
 // Идентификаторы проверяются по каталогу, а не по формату строки:
 // модель охотно выдумывает правдоподобные id, которых не существует.
 // Палитра и пара шрифтов проверяются не по всему каталогу, а по спискам
@@ -20,7 +28,10 @@ export const GeneratedDirectionSchema = z
     directionId: z.string(),
     name: z.string().min(GENERATED_FIELDS.name.min).max(GENERATED_FIELDS.name.max),
     concept: z.string().min(GENERATED_FIELDS.concept.min).max(GENERATED_FIELDS.concept.max),
-    keywords: z.array(z.string().min(2).max(30)).min(3).max(6),
+    keywords: z
+      .array(z.string().min(KEYWORDS.wordMin).max(KEYWORDS.wordMax))
+      .min(KEYWORDS.min)
+      .max(KEYWORDS.max),
     paletteId: z.string(),
     fontPairId: z.string(),
     rationale: z
