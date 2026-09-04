@@ -1,7 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
+// Очередь значений incr на тест про лимит. Пусто — счётчик отдаёт 1,
+// как и раньше: остальные тесты про лимит ничего не знают.
+const incrQueue = vi.hoisted(() => [] as number[]);
+
 vi.mock("@/lib/redis", () => ({
-  redis: { incr: vi.fn().mockResolvedValue(1), expire: vi.fn().mockResolvedValue(1) },
+  redis: {
+    incr: vi.fn(async () => incrQueue.shift() ?? 1),
+    expire: vi.fn().mockResolvedValue(1),
+  },
   DAY_SECONDS: 86400,
 }));
 
@@ -53,6 +60,7 @@ async function readSections(res: Response) {
 }
 
 beforeEach(() => {
+  incrQueue.length = 0;
   process.env.APP_SALT = "тестовая-соль";
   process.env.POLZA_API_KEY = "тестовый-ключ";
   vi.resetModules();
@@ -96,6 +104,21 @@ describe("POST /api/directions", () => {
     delete process.env.POLZA_API_KEY;
     const res = await post({ brand: "уютная кофейня в центре города" });
     expect(res.status).toBe(500);
+  });
+
+  it("пропускает два прохода в сутки, а третьему отвечает 429", async () => {
+    // incr считает вместе с текущим запросом, DAILY_LIMIT равен двум.
+    incrQueue.push(1, 2, 3);
+    const brief = { brand: "уютная кофейня в центре города" };
+
+    // Лимит пропустил — значит дошли до вызова апстрима, а там стоит
+    // запрещающий global.fetch: наружу запрос не уходит, но и 429 не
+    // возвращается. Ровно это и надо доказать про первые два прохода.
+    await expect(post(brief)).rejects.toThrow("fetch в тестах запрещён");
+    await expect(post(brief)).rejects.toThrow("fetch в тестах запрещён");
+
+    const third = await post(brief);
+    expect(third.status).toBe(429);
   });
 
   it("дочитывает хвост: поток без завершающего перевода строки отдаёт все три направления", async () => {
