@@ -33,7 +33,7 @@
     "keywords": ["контраст", "обводка", "плотность", "прямота", "напор"],
     "language": "Neo-brutalism. Thick black outlines, hard offset shadows, oversized type, raw unmodulated colour blocks, deliberate roughness. Loud and unpolished on purpose.",
     "paletteIds": ["sports-team-club", "automotive-car-dealership", "photography-studio", "portfolio-personal"],
-    "fontPairIds": ["display-heavy", "condensed-poster", "tech-terminal"]
+    "fontPairIds": ["condensed-poster", "tech-terminal"]
   },
   {
     "id": "retro-futur",
@@ -50,8 +50,8 @@
     "tier": "bold",
     "keywords": ["круг и квадрат", "диагональ", "первичный цвет", "агитация", "конструкция"],
     "language": "Bauhaus and constructivism. Primary colour on off-white, circle-square-triangle vocabulary, strong diagonals, heavy geometric sans, poster composition with visible structure.",
-    "paletteIds": ["sports-team-club", "construction-architecture", "saas-general", "portfolio-personal"],
-    "fontPairIds": ["grotesque-clean", "display-heavy", "geometric-soft"]
+    "paletteIds": ["sports-team-club", "saas-general", "crowdfunding-platform", "trivia-quiz-game"],
+    "fontPairIds": ["grotesque-clean", "display-heavy"]
   },
   {
     "id": "y2k",
@@ -78,6 +78,6 @@
     "keywords": ["вырезка", "слои", "плёнка", "шум", "рукотворность"],
     "language": "Cut-and-paste collage maximalism. Scanned paper edges, layered photographic fragments, halftone and grain, mixed type sizes inside one line, controlled visual noise.",
     "paletteIds": ["generative-art-platform", "magazine-blog", "marketing-agency", "creator-economy-platform"],
-    "fontPairIds": ["condensed-poster", "display-heavy", "editorial-modern"]
+    "fontPairIds": ["condensed-poster", "display-heavy"]
   }
 ]

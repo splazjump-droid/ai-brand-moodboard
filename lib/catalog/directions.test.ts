@@ -59,4 +59,19 @@ describe("каталог направлений", () => {
     expect(findDirection(DIRECTIONS[0].id)?.id).toBe(DIRECTIONS[0].id);
     expect(findDirection("нет-такого")).toBeUndefined();
   });
+
+  it("направления с разных уровней не делят больше одной палитры и одной пары шрифтов", () => {
+    // В одной генерации берётся по одному направлению на уровень. Если пара
+    // с разных уровней делит пул ресурсов, карточки Safe и Bold рискуют
+    // отрисоваться одинаковыми — а различать их должна структура, не текст.
+    for (const a of DIRECTIONS) {
+      for (const b of DIRECTIONS) {
+        if (a.tier === b.tier || a.id >= b.id) continue;
+        const palettes = a.paletteIds.filter((p) => b.paletteIds.includes(p));
+        const fonts = a.fontPairIds.filter((f) => b.fontPairIds.includes(f));
+        expect(palettes.length, `${a.id} и ${b.id} делят палитры: ${palettes}`).toBeLessThanOrEqual(1);
+        expect(fonts.length, `${a.id} и ${b.id} делят пары шрифтов: ${fonts}`).toBeLessThanOrEqual(1);
+      }
+    }
+  });
 });
