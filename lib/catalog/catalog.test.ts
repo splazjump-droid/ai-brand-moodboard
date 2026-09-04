@@ -1,26 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { STYLES, PALETTES, FONT_PAIRS, findStyle } from "./index";
+import { PALETTES, FONT_PAIRS } from "./index";
 
 const BANNED_FONTS = ["Inter", "Roboto", "Arial", "Open Sans", "Lato", "Space Grotesk"];
-
-describe("каталог стилей", () => {
-  it("не пустой и у каждого стиля есть id и ключевые слова", () => {
-    expect(STYLES.length).toBeGreaterThan(10);
-    for (const s of STYLES) {
-      expect(s.id).toMatch(/^[a-z0-9-]+$/);
-      expect(s.keywords.length).toBeGreaterThan(0);
-    }
-  });
-
-  it("id уникальны", () => {
-    expect(new Set(STYLES.map((s) => s.id)).size).toBe(STYLES.length);
-  });
-
-  it("findStyle находит по id и молчит на неизвестном", () => {
-    expect(findStyle(STYLES[0].id)?.id).toBe(STYLES[0].id);
-    expect(findStyle("нет-такого")).toBeUndefined();
-  });
-});
 
 describe("каталог палитр", () => {
   it("у каждой палитры заполнены все роли цвета", () => {

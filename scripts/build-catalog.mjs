@@ -36,17 +36,6 @@ function parseCsv(text) {
 const slug = (s) =>
   s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 
-// Стили: только активные, только поля, которые уходят в промпт.
-const styles = parseCsv(readFileSync(`${SRC}/styles.csv`, "utf8"))
-  .filter((r) => r.Status === "active" && r["Style ID"])
-  .map((r) => ({
-    id: r["Style ID"],
-    name: r["Style Category"],
-    keywords: r.Keywords.split(",").map((k) => k.trim()).filter(Boolean).slice(0, 8),
-    bestFor: r["Best For"],
-    avoidFor: r["Do Not Use For"],
-  }));
-
 // Палитры: у источника нет собственного id, собираем из типа продукта.
 const seen = new Map();
 const palettes = parseCsv(readFileSync(`${SRC}/colors.csv`, "utf8"))
@@ -70,6 +59,5 @@ const palettes = parseCsv(readFileSync(`${SRC}/colors.csv`, "utf8"))
     };
   });
 
-writeFileSync("lib/catalog/styles.json", JSON.stringify(styles, null, 2) + "\n");
 writeFileSync("lib/catalog/palettes.json", JSON.stringify(palettes, null, 2) + "\n");
-console.log(`стилей: ${styles.length}, палитр: ${palettes.length}`);
+console.log(`палитр: ${palettes.length}`);

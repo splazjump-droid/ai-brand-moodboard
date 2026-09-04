@@ -1,0 +1,83 @@
+[
+  {
+    "id": "swiss",
+    "name": "Швейцарская школа",
+    "tier": "safe",
+    "keywords": ["сетка", "порядок", "воздух", "нейтральность", "ясность"],
+    "language": "International Typographic Style. Strict modular grid, generous white space, one accent colour, flush-left ragged-right setting, photography cropped hard. Nothing decorative survives.",
+    "paletteIds": ["portfolio-personal", "architecture-interior", "museum-gallery", "construction-architecture"],
+    "fontPairIds": ["grotesque-clean", "geometric-soft", "serif-strict"]
+  },
+  {
+    "id": "editorial",
+    "name": "Журнальная подача",
+    "tier": "safe",
+    "keywords": ["разворот", "колонки", "буквица", "текст как картинка", "ритм"],
+    "language": "Magazine editorial. Large display headline against a fine text face, multi-column body, pull quotes, generous leading, images bleeding to the margin. Reads like a printed spread.",
+    "paletteIds": ["magazine-blog", "news-media-platform", "museum-gallery", "e-commerce-luxury"],
+    "fontPairIds": ["editorial-classic", "editorial-modern", "condensed-poster"]
+  },
+  {
+    "id": "midcentury",
+    "name": "Середина века",
+    "tier": "safe",
+    "keywords": ["тепло", "охра", "простая форма", "домашнее", "спокойствие"],
+    "language": "Mid-century modern. Warm earthy palette, simple rounded geometry, hand-set warmth without nostalgia kitsch, muted print-like colour, calm asymmetry.",
+    "paletteIds": ["bakery-cafe", "brewery-winery", "restaurant-food-service", "agriculture-farm-tech"],
+    "fontPairIds": ["serif-warm", "geometric-soft", "antique-refined"]
+  },
+  {
+    "id": "neo-brutal",
+    "name": "Нео-брутализм",
+    "tier": "bold",
+    "keywords": ["контраст", "обводка", "плотность", "прямота", "напор"],
+    "language": "Neo-brutalism. Thick black outlines, hard offset shadows, oversized type, raw unmodulated colour blocks, deliberate roughness. Loud and unpolished on purpose.",
+    "paletteIds": ["sports-team-club", "automotive-car-dealership", "photography-studio", "portfolio-personal"],
+    "fontPairIds": ["display-heavy", "condensed-poster", "tech-terminal"]
+  },
+  {
+    "id": "retro-futur",
+    "name": "Ретрофутуризм",
+    "tier": "bold",
+    "keywords": ["неон", "закат", "хром", "космос", "восьмидесятые"],
+    "language": "Retro-futurism. Eighties science fiction optimism, neon glow on deep night ground, chrome and gradient sheen, horizon grids, wide letterspaced display type.",
+    "paletteIds": ["theater-cinema", "space-tech-aerospace", "music-streaming", "gaming"],
+    "fontPairIds": ["display-loud", "tech-precise", "condensed-poster"]
+  },
+  {
+    "id": "bauhaus",
+    "name": "Баухаус и конструктивизм",
+    "tier": "bold",
+    "keywords": ["круг и квадрат", "диагональ", "первичный цвет", "агитация", "конструкция"],
+    "language": "Bauhaus and constructivism. Primary colour on off-white, circle-square-triangle vocabulary, strong diagonals, heavy geometric sans, poster composition with visible structure.",
+    "paletteIds": ["sports-team-club", "construction-architecture", "saas-general", "portfolio-personal"],
+    "fontPairIds": ["grotesque-clean", "display-heavy", "geometric-soft"]
+  },
+  {
+    "id": "y2k",
+    "name": "Стиль Y2K",
+    "tier": "experimental",
+    "keywords": ["хром", "глянец", "пузырь", "переливы", "нулевые"],
+    "language": "Y2K aesthetic. Liquid chrome, iridescent gradients, bubbly inflated shapes, lens flare, early-web optimism rendered at high gloss.",
+    "paletteIds": ["nft-web3-platform", "quantum-computing-interface", "gaming", "subscription-box-service"],
+    "fontPairIds": ["display-loud", "tech-terminal", "display-heavy"]
+  },
+  {
+    "id": "memphis",
+    "name": "Мемфис",
+    "tier": "experimental",
+    "keywords": ["зигзаг", "крапинка", "асимметрия", "игра", "постмодерн"],
+    "language": "Memphis Group postmodernism. Squiggles, confetti dots, terrazzo texture, clashing saturated colour, deliberately unbalanced composition, playful and unserious.",
+    "paletteIds": ["creator-economy-platform", "childcare-daycare", "creative-agency", "subscription-box-service"],
+    "fontPairIds": ["display-heavy", "geometric-soft", "display-loud"]
+  },
+  {
+    "id": "collage",
+    "name": "Коллаж и максимализм",
+    "tier": "experimental",
+    "keywords": ["вырезка", "слои", "плёнка", "шум", "рукотворность"],
+    "language": "Cut-and-paste collage maximalism. Scanned paper edges, layered photographic fragments, halftone and grain, mixed type sizes inside one line, controlled visual noise.",
+    "paletteIds": ["generative-art-platform", "magazine-blog", "marketing-agency", "creator-economy-platform"],
+    "fontPairIds": ["condensed-poster", "display-heavy", "editorial-modern"]
+  }
+]
