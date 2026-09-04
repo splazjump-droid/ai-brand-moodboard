@@ -806,7 +806,8 @@ git commit -m "Девять брендовых направлений вмест
 - Consumes: ничего
 - Produces:
   - `BriefSchema` (zod), `type Brief = z.infer<typeof BriefSchema>`
-  - `BRIEF_FIELDS: Record<keyof Brief, { min: number; max: number; label: string }>`
+  - `BRIEF_FIELDS: Record<TextField, { min: number; max: number; label: string }>` — границы длины ТЕКСТОВЫХ полей (`brand`, `audience`, `characterFree`, `aestheticFree`, `avoid`). Не все ключи `Brief`: массивы чипов измеряются в штуках, а не в знаках, и в промпт уходят иначе.
+  - `MAX_CHIPS: number` — потолок числа чипов в группе
   - `stripEmpty(brief: Partial<Brief>): Partial<Brief>` — выкидывает пустые строки и пустые массивы
   - `briefFullness(brief: Partial<Brief>): { ratio: number; level: "thin" | "ok" | "rich"; note: string }`
 
@@ -1247,7 +1248,8 @@ git commit -m "Суточный лимит: хеш адреса, ключ сут
 - Consumes: `Brief`, `BRIEF_FIELDS` из `@/lib/brief-schema`; `Direction`, `Tier`, `TIERS`, `DIRECTIONS`, `findDirection`, `directionsByTier` из `@/lib/catalog`
 - Produces:
   - `GeneratedDirectionSchema` (zod), `type GeneratedDirection = z.infer<typeof GeneratedDirectionSchema>`
-  - `GENERATED_FIELDS: { name: {min,max}; concept: {min,max}; rationale: {min,max} }`
+  - `GENERATED_FIELDS: { name: {min,max}; concept: {min,max}; rationale: {min,max} }` — границы длины текстовых полей в знаках
+  - `KEYWORDS: { min, max, wordMin, wordMax }` — количество ключевых слов и длина каждого. Отдельно от `GENERATED_FIELDS`: единицы измерения разные, но источник всё равно один — схема проверяет по этим числам, промпт из них же собирает инструкцию
   - `buildSystemPrompt(directions: Direction[]): string`
   - `buildUserMessage(brief: Partial<Brief>): string`
 
