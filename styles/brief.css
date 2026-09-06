@@ -187,8 +187,8 @@
 }
 
 .input:focus-visible {
-  border-block-end-color: var(--accent);
-  outline: 2px solid var(--accent);
+  border-block-end-color: var(--focus);
+  outline: 2px solid var(--focus);
   outline-offset: 4px;
 }
 
@@ -220,18 +220,25 @@
 }
 
 /* Чипы стоят одним блоком, разделённые волосяной линией: банк
-   переключателей, а не россыпь таблеток. */
+   переключателей, а не россыпь таблеток. Линии кладёт сам чип своей
+   тенью, а не просвет между чипами: иначе недобранный хвост строки
+   вылезал бы полосой линейки. Цвет линии непрозрачный — там, где тени
+   соседей встречаются, он не удваивается. */
 .chip-row {
+  --hairline: color-mix(in oklab, var(--ink) 18%, var(--paper-raised));
   display: flex;
   flex-wrap: wrap;
   gap: 1px;
   border: 1px solid var(--rule);
-  background: var(--rule);
+  background: var(--paper-raised);
 }
 
+/* Чип шириной по содержимому в любой строке: расти нельзя, иначе
+   одинокий чип в последней строке растягивается на всю ширину. */
 .chip {
-  flex: 1 0 auto;
+  flex: 0 0 auto;
   min-inline-size: max-content;
+  box-shadow: 0 0 0 1px var(--hairline);
   min-block-size: var(--hit);
   padding: 0.6rem var(--step-2);
   border: 0;
@@ -253,7 +260,9 @@
   background: var(--ink);
   color: var(--paper-raised);
   font-weight: 600;
-  box-shadow: inset 3px 0 0 var(--accent);
+  box-shadow:
+    inset 3px 0 0 var(--accent),
+    0 0 0 1px var(--hairline);
 }
 
 .chip[aria-pressed="true"]:hover {
@@ -261,12 +270,17 @@
 }
 
 /* Фокус не совпадает с наведением: наведение меняет заливку,
-   фокус ставит красную рамку внутрь полосы, чтобы её не срезал сосед. */
+   фокус ставит рамку внутрь полосы, чтобы её не срезал сосед. */
 .chip:focus-visible {
   position: relative;
   z-index: 1;
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--focus);
   outline-offset: -2px;
+}
+
+/* На выбранном чипе фон чернильный — рамка светлеет, чтобы не пропасть. */
+.chip[aria-pressed="true"]:focus-visible {
+  outline-color: var(--focus-on-ink);
 }
 
 .chip-free {
@@ -289,8 +303,8 @@
 }
 
 .chip-free:focus-visible {
-  border-color: var(--ink);
-  outline: 2px solid var(--accent);
+  border-color: var(--focus);
+  outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
 
