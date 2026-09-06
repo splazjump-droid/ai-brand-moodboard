@@ -9,7 +9,7 @@
     "mood": ["geometric", "friendly", "modern"] },
   { "id": "serif-warm", "heading": "Lora", "body": "Onest",
     "mood": ["warm", "human", "craft"] },
-  { "id": "serif-strict", "heading": "PT Serif", "body": "Plus Jakarta Sans",
+  { "id": "serif-strict", "heading": "PT Serif", "body": "PT Sans",
     "mood": ["strict", "institutional", "trustworthy"] },
   { "id": "display-loud", "heading": "Unbounded", "body": "Onest",
     "mood": ["loud", "bold", "contemporary"] },
