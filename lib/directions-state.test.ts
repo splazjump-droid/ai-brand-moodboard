@@ -4,8 +4,8 @@ import { directionsByTier, type Tier } from "./catalog";
 
 // Направление берётся из своего уровня вместе с его же палитрой и парой
 // шрифтов: схема проверяет согласованность, случайные id её не пройдут.
-const make = (tier: Tier) => {
-  const direction = directionsByTier(tier)[0];
+const make = (tier: Tier, index = 0) => {
+  const direction = directionsByTier(tier)[index];
   return {
     section: "direction",
     data: {
@@ -37,8 +37,13 @@ describe("накопление направлений", () => {
   });
 
   it("повтор того же уровня перезаписывает, а не удваивает", () => {
-    const state = accumulate([], [make("safe"), make("safe")]);
+    // Куски разные по содержимому: иначе тест не отличит «побеждает
+    // последнее» от «побеждает первое» и проверял бы только длину.
+    const first = make("safe", 0);
+    const second = make("safe", 1);
+    const state = accumulate([], [first, second]);
     expect(state).toHaveLength(1);
+    expect(state[0].directionId).toBe(second.data.directionId);
   });
 
   it("направление, не прошедшее схему, молча отбрасывается", () => {
