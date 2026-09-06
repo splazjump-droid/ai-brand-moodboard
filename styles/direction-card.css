@@ -1,0 +1,405 @@
+/*
+ * Карточка направления — монтажный лист. Снаружи наша бумага с чернильной
+ * волосяной рамкой: там подпись уровня, название направления из каталога и
+ * шкала риска. Внутри, на видимом паспарту и с собственной тенью, лежит
+ * образец бренда — он покрашен сгенерированной палитрой и набран
+ * сгенерированной парой шрифтов. Паспарту и есть тот приём, который
+ * отделяет чужой бренд от оболочки: между рамкой и образцом всегда видна
+ * полоса нашей бумаги, поэтому карточка читается «вот предложение», а не
+ * «сайт покрасился».
+ *
+ * Цвета бренда приходят inline-стилем в --brand-*, живут на .direction-specimen
+ * и не поднимаются выше. Значения ниже — запасные, на случай разъехавшегося
+ * каталога: тогда образец просто остаётся в цветах оболочки.
+ */
+
+/* Карточка меряет себя, а не окно: три штуки в ряд и три в столбик — это
+   разная ширина при одном и том же экране, поэтому все clamp внутри
+   считаются в cqi. */
+.direction-card {
+  --card-pad: clamp(1rem, 0.55rem + 1.6cqi, 2rem);
+
+  position: relative;
+  container-type: inline-size;
+  padding: var(--card-pad);
+  background: var(--paper-raised);
+  /* Колонки поля видно в поле паспарту — та же линейка, что у страницы. */
+  background-image: repeating-linear-gradient(
+    90deg,
+    var(--rule-hair) 0 1px,
+    transparent 1px var(--column)
+  );
+  box-shadow: 0 0 0 1px var(--rule);
+}
+
+/* --- Наша подпись: уровень, направление из каталога, шкала риска --- */
+
+/* Линейка под шапкой идёт от края до края рамки: в наборе это отбивка
+   листа, а не подчёркивание строки. Отрицание функции — только через calc. */
+.direction-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--step-1) var(--step-3);
+  margin-inline: calc(-1 * var(--card-pad));
+  margin-block-end: var(--card-pad);
+  padding-inline: var(--card-pad);
+  padding-block-end: var(--card-pad);
+  border-block-end: 1px solid var(--rule);
+}
+
+.direction-tier {
+  display: flex;
+  align-items: center;
+  font-family: var(--type-display);
+  font-weight: 800;
+  font-size: var(--text-micro);
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+
+.direction-tier-mark {
+  flex: none;
+  inline-size: 0.5rem;
+  block-size: 0.5rem;
+  margin-inline-end: 0.7rem;
+  background: var(--accent);
+}
+
+/* Тот же кегль, противоположное начертание — как в шапке страницы. */
+.direction-origin {
+  min-inline-size: 0;
+  font-family: var(--type-display);
+  font-weight: 200;
+  font-size: var(--text-micro);
+  letter-spacing: 0.06em;
+  color: var(--ink-muted);
+}
+
+.direction-risk {
+  display: flex;
+  gap: 3px;
+  margin-inline-start: auto;
+}
+
+.direction-risk-slot {
+  inline-size: 0.4375rem;
+  block-size: 0.4375rem;
+  box-shadow: inset 0 0 0 1px var(--rule);
+}
+
+.direction-risk-slot[data-on] {
+  background: var(--ink);
+  box-shadow: none;
+}
+
+/* --- Образец бренда --- */
+
+.direction-specimen {
+  --brand-bg: var(--paper-raised);
+  --brand-fg: var(--ink);
+  --brand-fg-muted: var(--ink-muted);
+  --brand-heading: var(--type-display);
+  --brand-body: var(--type-text);
+
+  /* Линии внутри образца выводятся из его же текстового цвета, а не из
+     роли border палитры: у палитр каталога border отличается от фона на
+     1.1:1 и на экране его просто нет. Текст к фону везде даёт не меньше
+     7:1, поэтому подмешанный текст виден на любой палитре — и на почти
+     белой, и на почти чёрной. */
+  --brand-hair: color-mix(in oklab, var(--brand-fg) 26%, var(--brand-bg));
+  --brand-hair-soft: color-mix(in oklab, var(--brand-fg) 13%, var(--brand-bg));
+  /* Отдельная, более тёмная линия — только на образцах цвета. Там граница
+     несёт смысл: на белой палитре белый образец и на чёрной чёрный видно
+     ровно по ней, поэтому она вытянута до трёх к одному с фоном. */
+  --brand-edge: color-mix(in oklab, var(--brand-fg) 55%, var(--brand-bg));
+
+  --specimen-pad: clamp(1.25rem, 0.55rem + 2.6cqi, 2.5rem);
+
+  position: relative;
+  padding: var(--specimen-pad);
+  overflow: hidden;
+  background: var(--brand-bg);
+  color: var(--brand-fg);
+  /* Тень отрывает образец от паспарту: ближняя даёт край листа, дальняя —
+     воздух под ним. Обе чернильные, из оболочки: это тень нашей бумаги,
+     а не цвет бренда. */
+  box-shadow:
+    0 0 0 1px var(--brand-hair),
+    0 2px 5px -3px oklch(19% 0.012 68 / 0.35),
+    0 20px 40px -26px oklch(19% 0.012 68 / 0.6);
+}
+
+/* Начертания у образца не подделываются: половина семейств каталога
+   статические, синтетический жир на них выглядит грязью. */
+.direction-name,
+.direction-concept,
+.direction-type-sample {
+  font-weight: 400;
+  font-synthesis-weight: none;
+}
+
+/* Имя бренда — самый крупный кегль карточки против одиннадцати пикселей
+   подписей. Сорок знаков без единого пробела рвутся по любому месту:
+   иначе строка вылезает за образец и уносит с собой всю раскладку. */
+.direction-name {
+  max-inline-size: 18ch;
+  font-family: var(--brand-heading);
+  font-size: clamp(1.75rem, 0.95rem + 3.3cqi, 3.25rem);
+  line-height: 1.03;
+  letter-spacing: -0.02em;
+  overflow-wrap: anywhere;
+  text-wrap: balance;
+}
+
+.direction-concept {
+  max-inline-size: 42ch;
+  margin-block-start: var(--step-3);
+  font-family: var(--brand-body);
+  font-size: clamp(0.9375rem, 0.9rem + 0.2cqi, 1.0625rem);
+  line-height: 1.62;
+  color: var(--brand-fg-muted);
+  text-wrap: pretty;
+}
+
+/* --- Ключевые слова --- */
+
+.direction-keywords {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1px;
+  margin-block-start: var(--step-3);
+  padding: 1px;
+  list-style: none;
+}
+
+/* Заливкой роль muted не берётся: у палитр каталога она отличается от
+   фона на 1.05:1, то есть плашки не было бы видно вовсе. Слова держит
+   волосяная рамка, а сами они набраны основным текстовым цветом. */
+.direction-keyword {
+  flex: 0 0 auto;
+  min-inline-size: 0;
+  padding: 0.45rem 0.7rem;
+  box-shadow: 0 0 0 1px var(--brand-hair);
+  font-family: var(--type-text);
+  font-size: var(--text-micro);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  overflow-wrap: anywhere;
+}
+
+/* --- Пара шрифтов --- */
+
+.direction-type {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: 1px;
+  margin-block-start: var(--step-4);
+  background: var(--brand-hair-soft);
+  border-block: 1px solid var(--brand-hair-soft);
+}
+
+.direction-type-cell {
+  min-inline-size: 0;
+  padding-block: var(--step-2);
+  padding-inline-end: var(--step-2);
+  background: var(--brand-bg);
+}
+
+/* Подписи ролей — наш голос на их цвете: шрифт оболочки, микрокегль. */
+.direction-type-role,
+.direction-swatch-role {
+  display: block;
+  font-family: var(--type-text);
+  font-size: var(--text-micro);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--brand-fg-muted);
+}
+
+.direction-type-family {
+  margin-block-start: 0.35rem;
+  font-family: var(--type-text);
+  font-size: var(--text-small);
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.direction-type-sample {
+  margin-block-start: 0.5rem;
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+}
+
+.direction-type-sample--heading {
+  font-family: var(--brand-heading);
+  font-size: clamp(1.3rem, 1.05rem + 0.9cqi, 1.9rem);
+  letter-spacing: -0.01em;
+}
+
+.direction-type-sample--body {
+  font-family: var(--brand-body);
+  font-size: clamp(1.1rem, 0.98rem + 0.45cqi, 1.4rem);
+}
+
+/* --- Палитра --- */
+
+/* Полоса идёт в край образца: цвет — единственное, что здесь показывают
+   без оправы, и обрез делает его материалом, а не иллюстрацией. */
+.direction-palette {
+  display: grid;
+  /* Пять колонок при любой ширине. Перенос на вторую строку рассыпал бы
+     полосу на ступеньки: подписи разной высоты — образцы на разных уровнях. */
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-rows: repeat(3, auto);
+  margin-block-start: var(--step-3);
+  margin-inline: calc(-1 * var(--specimen-pad));
+  margin-block-end: calc(-1 * var(--specimen-pad));
+  padding-block-start: var(--step-2);
+  list-style: none;
+}
+
+/* Строки колонки берутся у полосы: «подложка» переносится в две строки,
+   а нижний край образцов всё равно остаётся одной прямой. */
+.direction-swatch {
+  display: grid;
+  grid-row: span 3;
+  grid-template-rows: subgrid;
+  min-inline-size: 0;
+}
+
+/* Пять подписей делят ширину карточки, поэтому кегель здесь свой,
+   плавающий: на узкой карточке ячейка уже пятидесяти пикселей, и
+   фиксированные одиннадцать рвали бы «#FEF3C7» пополам. */
+.direction-swatch-role,
+.direction-swatch-hex {
+  display: block;
+  padding-inline: clamp(0.35rem, 0.15rem + 0.6cqi, 0.6rem);
+  font-size: clamp(0.5625rem, 0.47rem + 0.28cqi, var(--text-micro));
+}
+
+.direction-swatch-role {
+  letter-spacing: 0.04em;
+  overflow-wrap: anywhere;
+}
+
+.direction-swatch-hex {
+  align-self: end;
+  padding-block: 0.2rem 0.55rem;
+  font-family: var(--type-text);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Образцы цвета стоят вплотную, поэтому каждый ограничен соседом. Границу
+   всей полосы с фоном держит волосяная линия: иначе на почти белой палитре
+   пропадал бы белый образец, а на почти чёрной — чёрный. */
+.direction-swatch-chip {
+  display: block;
+  block-size: 3.25rem;
+  box-shadow: inset 0 0 0 1px var(--brand-edge);
+}
+
+/* --- Узкая карточка: полоса палитры разворачивается в список --- */
+
+/* Пять колонок на телефоне дают ячейку в полсотни пикселей, где «подложка»
+   рвётся посередине слова. Ниже 30rem полоса становится списком: цвет
+   уходит в край строкой, роль и код читаются целиком. */
+@container (max-width: 30rem) {
+  .direction-palette {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: none;
+  }
+
+  .direction-swatch {
+    grid-row: auto;
+    grid-template-rows: none;
+    grid-template-columns: 4.5rem minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: var(--step-2);
+    padding-inline-end: var(--specimen-pad);
+    border-block-start: 1px solid var(--brand-hair-soft);
+  }
+
+  /* Строка назначается явно: в разметке образец цвета идёт последним,
+     и без grid-row автопоток сносил бы его на вторую строку. */
+  .direction-swatch-chip {
+    grid-area: 1 / 1;
+    block-size: 2.5rem;
+  }
+
+  .direction-swatch-role {
+    grid-area: 1 / 2;
+    padding-inline: 0;
+    font-size: var(--text-micro);
+  }
+
+  .direction-swatch-hex {
+    grid-area: 1 / 3;
+    align-self: center;
+    padding: 0;
+    font-size: var(--text-micro);
+  }
+}
+
+/* --- Широкая карточка: образец разводится на две колонки --- */
+
+/* Одноколонный образец на всю ширину экрана оставляет справа пустое поле
+   на треть карточки — не воздух, а недоделка. От 52rem пара шрифтов
+   уходит вправо отдельным столбцом, полоска палитры остаётся во всю ширину. */
+@container (min-width: 52rem) {
+  .direction-specimen {
+    display: grid;
+    grid-template-columns: minmax(0, 1.25fr) minmax(0, 0.75fr);
+    grid-template-areas:
+      "name    type"
+      "concept type"
+      "keys    type"
+      "palette palette";
+    column-gap: var(--specimen-pad);
+  }
+
+  .direction-name {
+    grid-area: name;
+  }
+
+  .direction-concept {
+    grid-area: concept;
+  }
+
+  .direction-keywords {
+    grid-area: keys;
+    align-self: start;
+  }
+
+  .direction-type {
+    grid-area: type;
+    grid-template-columns: minmax(0, 1fr);
+    margin-block-start: 0.35rem;
+  }
+
+  .direction-type-cell {
+    padding-inline: var(--step-2);
+    padding-inline-start: 0;
+  }
+
+  .direction-palette {
+    grid-area: palette;
+  }
+}
+
+/* --- Появление --- */
+
+@media (prefers-reduced-motion: no-preference) {
+  .direction-card {
+    animation: card-in var(--dur-slow) var(--ease-out-expo) both;
+  }
+}
+
+@keyframes card-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 18px, 0);
+  }
+}
