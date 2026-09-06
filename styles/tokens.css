@@ -1,0 +1,61 @@
+/*
+ * Оболочка сервиса. Швейцарская сетка: бумага, чернила, один плакатный
+ * акцент. Сгенерированная палитра бренда сюда не попадает никогда —
+ * вся цветность живёт внутри карточек результата.
+ */
+
+:root {
+  color-scheme: light;
+
+  /* Бумага и чернила. Почти монохром: тёплый нейтральный, чуть уведённый
+     от нуля по хрому, чтобы серый не выглядел цифровым. */
+  --paper: oklch(96.4% 0.006 92);
+  --paper-raised: oklch(99.2% 0.003 92);
+  --paper-sunk: oklch(93.5% 0.008 90);
+  --ink: oklch(19% 0.012 68);
+  --ink-muted: oklch(47% 0.01 68);
+  --ink-faint: oklch(70% 0.008 68);
+  --rule: oklch(19% 0.012 68 / 0.18);
+  --rule-hair: oklch(19% 0.012 68 / 0.09);
+
+  /* Единственный акцент — плакатный красный международного стиля.
+     Появляется только там, где несёт смысл: выбор, фокус, готовность. */
+  --accent: oklch(52.5% 0.196 29);
+  --accent-strong: oklch(45% 0.18 29);
+  --accent-ink: oklch(98% 0.006 60);
+
+  --type-display: var(--font-unbounded), sans-serif;
+  --type-text: var(--font-onest), sans-serif;
+
+  /* Кегель. Прыжки в три раза и больше: микроподпись 11px против
+     заголовка под 112px — это и есть вся иерархия, других приёмов нет. */
+  --text-micro: 0.6875rem;
+  --text-small: 0.8125rem;
+  --text-body: clamp(0.9375rem, 0.89rem + 0.22vw, 1.0625rem);
+  --text-lead: clamp(1.0625rem, 0.95rem + 0.55vw, 1.4375rem);
+  --text-figure: clamp(1.75rem, 1.1rem + 2.4vw, 3rem);
+  --text-hero: clamp(2.75rem, 0.6rem + 9.4vw, 7rem);
+
+  /* Вертикальный ритм кратен базовой строке в 8px. */
+  --step-1: 0.5rem;
+  --step-2: 1rem;
+  --step-3: 1.5rem;
+  --step-4: 2.5rem;
+  --step-5: 4rem;
+  --step-6: clamp(3.5rem, 1.5rem + 7vw, 8rem);
+
+  /* Поля хватаются за одну вертикаль; номера разделов висят слева в поле. */
+  --rail: clamp(2.75rem, 1.2rem + 4.5vw, 5.5rem);
+  --measure: 46rem;
+  --column: 5.5rem;
+  --pad: clamp(1.25rem, 0.4rem + 3.2vw, 4rem);
+  --hit: 2.75rem;
+
+  --dur-fast: 120ms;
+  --dur: 260ms;
+  --dur-slow: 640ms;
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+
+  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23g)'/%3E%3C/svg%3E");
+}

@@ -1,0 +1,502 @@
+/*
+ * Швейцарский набор: одна жёсткая левая ось, номера разделов висят слева
+ * в поле, иерархия держится на кегле и на двух крайних начертаниях —
+ * Unbounded 200 против Unbounded 800. Анимируются только transform
+ * и opacity, цвета переключаются мгновенно.
+ */
+
+.shell {
+  position: relative;
+  inline-size: 100%;
+  max-inline-size: 96rem;
+  margin-inline: auto;
+  padding-block: var(--step-6) var(--step-6);
+  padding-inline: var(--pad);
+}
+
+/* Колонки сетки видно — правая пустота становится намеренной, а не забытой. */
+.shell::before {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  inset-inline: var(--pad) 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image: repeating-linear-gradient(
+    90deg,
+    var(--rule-hair) 0 1px,
+    transparent 1px var(--column)
+  );
+  mask-image: linear-gradient(
+    180deg,
+    transparent,
+    oklch(0% 0 0 / 0.85) 14%,
+    oklch(0% 0 0 / 0.85) 74%,
+    transparent
+  );
+}
+
+/* --- Шапка --- */
+
+.masthead {
+  position: relative;
+  max-inline-size: var(--measure);
+  padding-inline-start: var(--rail);
+  margin-block-end: var(--step-5);
+}
+
+.eyebrow {
+  display: flex;
+  align-items: center;
+  font-family: var(--type-display);
+  font-weight: 200;
+  font-size: var(--text-micro);
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  margin-block-end: var(--step-3);
+}
+
+.eyebrow-mark {
+  inline-size: 0.5rem;
+  block-size: 0.5rem;
+  margin-inline-end: 0.85rem;
+  background: var(--accent);
+  flex: none;
+}
+
+.masthead-title {
+  font-family: var(--type-display);
+  font-size: var(--text-hero);
+  font-weight: 800;
+  line-height: 0.84;
+  letter-spacing: -0.05em;
+  margin-block-end: var(--step-4);
+}
+
+/* Тот же кегль, противоположное начертание: контраст берётся крайностями. */
+.masthead-title-light {
+  display: block;
+  font-weight: 200;
+  letter-spacing: -0.035em;
+  color: var(--ink-muted);
+}
+
+.masthead-lead {
+  max-inline-size: 34rem;
+  font-size: var(--text-lead);
+  line-height: 1.4;
+  color: var(--ink-muted);
+  text-wrap: pretty;
+}
+
+.masthead::after {
+  content: "";
+  display: block;
+  block-size: 2px;
+  margin-block-start: var(--step-4);
+  background: var(--ink);
+  transform-origin: left center;
+}
+
+/* --- Форма --- */
+
+.brief {
+  position: relative;
+  max-inline-size: var(--measure);
+  padding-inline-start: var(--rail);
+  display: flex;
+  flex-direction: column;
+  gap: var(--step-4);
+}
+
+.field {
+  position: relative;
+  min-inline-size: 0;
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+
+/* Номер привязан к своей подписи, а не к секции: у fieldset legend
+   лежит вне padding-box, и привязка к секции роняет номер вниз. */
+.field-index {
+  position: absolute;
+  inset-inline-start: calc(-1 * var(--rail));
+  inset-block-start: 0.15em;
+  font-family: var(--type-display);
+  font-weight: 200;
+  font-size: var(--text-small);
+  letter-spacing: 0.08em;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-faint);
+}
+
+.field-label {
+  position: relative;
+  display: block;
+  padding: 0;
+  margin-block-end: var(--step-2);
+  font-family: var(--type-display);
+  font-weight: 800;
+  font-size: var(--text-small);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.field-flag {
+  margin-inline-start: var(--step-2);
+  font-family: var(--type-text);
+  font-weight: 500;
+  font-size: var(--text-micro);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.input {
+  display: block;
+  inline-size: 100%;
+  min-block-size: var(--hit);
+  padding: 0.6rem 0.25rem;
+  border: 0;
+  border-block-end: 1.5px solid var(--rule);
+  border-radius: 0;
+  background-color: transparent;
+  background-image: linear-gradient(
+    180deg,
+    transparent 45%,
+    oklch(19% 0.012 68 / 0.035)
+  );
+  font-size: var(--text-body);
+  line-height: 1.6;
+}
+
+.input--area {
+  min-block-size: 8.5rem;
+  padding-block: 0.6rem 0.8rem;
+  resize: vertical;
+}
+
+.input::placeholder {
+  color: var(--ink-faint);
+}
+
+.input:hover {
+  border-block-end-color: oklch(19% 0.012 68 / 0.45);
+}
+
+.input:focus-visible {
+  border-block-end-color: var(--accent);
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+}
+
+.field-meter {
+  display: flex;
+  gap: 0.4rem;
+  margin-block-start: 0.4rem;
+  font-size: var(--text-micro);
+  letter-spacing: 0.06em;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-faint);
+}
+
+.field-meter-count {
+  color: var(--ink-muted);
+}
+
+.field-meter-need {
+  margin-inline-start: auto;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+}
+
+/* --- Чипы --- */
+
+.chip-group {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Чипы стоят одним блоком, разделённые волосяной линией: банк
+   переключателей, а не россыпь таблеток. */
+.chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1px;
+  border: 1px solid var(--rule);
+  background: var(--rule);
+}
+
+.chip {
+  flex: 1 0 auto;
+  min-inline-size: max-content;
+  min-block-size: var(--hit);
+  padding: 0.6rem var(--step-2);
+  border: 0;
+  border-radius: 0;
+  background: var(--paper-raised);
+  color: var(--ink-muted);
+  font-size: var(--text-small);
+  font-weight: 500;
+  text-align: start;
+  cursor: pointer;
+}
+
+.chip:hover {
+  background: var(--paper-sunk);
+  color: var(--ink);
+}
+
+.chip[aria-pressed="true"] {
+  background: var(--ink);
+  color: var(--paper-raised);
+  font-weight: 600;
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.chip[aria-pressed="true"]:hover {
+  background: oklch(29% 0.014 68);
+}
+
+/* Фокус не совпадает с наведением: наведение меняет заливку,
+   фокус ставит красную рамку внутрь полосы, чтобы её не срезал сосед. */
+.chip:focus-visible {
+  position: relative;
+  z-index: 1;
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.chip-free {
+  inline-size: 100%;
+  min-block-size: var(--hit);
+  padding: 0.65rem var(--step-2);
+  border: 1px solid var(--rule);
+  border-block-start: 0;
+  border-radius: 0;
+  background: var(--paper);
+  font-size: var(--text-small);
+}
+
+.chip-free::placeholder {
+  color: var(--ink-faint);
+}
+
+.chip-free:hover {
+  background: var(--paper-raised);
+}
+
+.chip-free:focus-visible {
+  border-color: var(--ink);
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* --- Подвал формы --- */
+
+.brief-foot {
+  display: flex;
+  flex-direction: column;
+  gap: var(--step-4);
+  margin-block-start: var(--step-3);
+  padding-block-start: var(--step-3);
+  border-block-start: 1.5px solid var(--rule);
+}
+
+/* Крупная цифра слева, подпись и полоса справа от неё — ещё один
+   перепад кегля вместо декоративного индикатора. */
+.fullness {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-areas:
+    "value caption"
+    "value track"
+    "value note";
+  column-gap: var(--step-3);
+  row-gap: 0.5rem;
+  align-items: center;
+}
+
+.fullness-caption {
+  grid-area: caption;
+  align-self: end;
+  font-family: var(--type-display);
+  font-weight: 200;
+  font-size: var(--text-micro);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.fullness-value {
+  grid-area: value;
+  align-self: center;
+  font-family: var(--type-display);
+  font-weight: 200;
+  font-size: var(--text-figure);
+  line-height: 1;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+
+.fullness-unit {
+  margin-inline-start: 0.1em;
+  font-size: 0.42em;
+  letter-spacing: 0.08em;
+  color: var(--ink-faint);
+}
+
+.fullness-track {
+  grid-area: track;
+  display: block;
+  block-size: 4px;
+  background: var(--rule-hair);
+  box-shadow: inset 0 0 0 1px var(--rule-hair);
+  overflow: hidden;
+}
+
+.fullness-fill {
+  display: block;
+  block-size: 100%;
+  background: var(--ink-faint);
+  transform: scaleX(var(--fullness, 0));
+  transform-origin: left center;
+  transition: transform var(--dur-slow) var(--ease-out-expo);
+}
+
+.fullness[data-level="ok"] .fullness-fill {
+  background: var(--ink-muted);
+}
+
+.fullness[data-level="rich"] .fullness-fill {
+  background: var(--accent);
+}
+
+.fullness-note {
+  grid-area: note;
+  align-self: start;
+  font-size: var(--text-small);
+  color: var(--ink-muted);
+}
+
+.submit {
+  position: relative;
+  align-self: flex-start;
+  min-block-size: var(--hit);
+  padding: 1rem var(--step-4);
+  border: 1px solid var(--ink);
+  border-radius: 0;
+  background: var(--ink);
+  color: var(--paper-raised);
+  font-family: var(--type-display);
+  font-weight: 800;
+  font-size: var(--text-small);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  overflow: hidden;
+  transition: transform var(--dur) var(--ease);
+}
+
+/* Красная заливка выезжает слева направо — движение по transform,
+   а не подкрашивание фона. */
+.submit::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--accent-strong);
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform var(--dur) var(--ease-out-expo);
+}
+
+.submit-label {
+  position: relative;
+}
+
+.submit-arrow {
+  position: relative;
+  display: inline-block;
+  margin-inline-start: 0.85rem;
+  transition: transform var(--dur) var(--ease);
+}
+
+.submit:hover:not(:disabled)::before {
+  transform: scaleX(1);
+}
+
+.submit:hover:not(:disabled) .submit-arrow {
+  transform: translateX(5px);
+}
+
+.submit:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.submit:disabled {
+  background: transparent;
+  border-color: var(--rule);
+  color: var(--ink-faint);
+  cursor: not-allowed;
+}
+
+/* --- Сборка страницы: одна ступенчатая волна --- */
+
+@media (prefers-reduced-motion: no-preference) {
+  .masthead::after {
+    transform: scaleX(0);
+    animation: rule-in 900ms var(--ease-out-expo) 260ms forwards;
+  }
+}
+
+@keyframes rule-in {
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fullness-fill,
+  .submit,
+  .submit::before,
+  .submit-arrow {
+    transition: none;
+  }
+}
+
+/* --- Узкий экран: поле с номерами схлопывается, ось остаётся --- */
+
+@media (max-width: 34rem) {
+  .masthead,
+  .brief {
+    padding-inline-start: 0;
+  }
+
+  .field-index {
+    position: static;
+    display: block;
+    margin-block-end: var(--step-1);
+  }
+
+  .fullness {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "caption"
+      "value"
+      "track"
+      "note";
+    justify-items: start;
+  }
+
+  .fullness-track {
+    inline-size: 100%;
+  }
+
+  .submit {
+    align-self: stretch;
+    inline-size: 100%;
+  }
+}

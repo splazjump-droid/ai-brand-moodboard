@@ -4,8 +4,16 @@
   margin: 0;
 }
 
+/* Фон живёт на корне, а не на body: иначе градиент считается по высоте
+   окна и на длинной странице даёт горизонтальный шов. */
 html {
-  height: 100%;
+  min-height: 100%;
+  -webkit-text-size-adjust: 100%;
+  background-color: var(--paper);
+  background-image:
+    radial-gradient(115% 55% at 2% -6%, oklch(100% 0 0 / 0.95), transparent 62%),
+    radial-gradient(70% 40% at 102% 104%, oklch(52.5% 0.196 29 / 0.07), transparent 68%),
+    linear-gradient(180deg, oklch(98.6% 0.004 92), oklch(94.8% 0.009 88));
 }
 
 html,
@@ -18,14 +26,79 @@ body {
   min-height: 100%;
   display: flex;
   flex-direction: column;
-  color: oklch(20.5% 0 0);
-  background: oklch(100% 0 0);
-  font-family: system-ui, sans-serif;
+  color: var(--ink);
+  font-family: var(--type-text);
+  font-size: var(--text-body);
+  line-height: 1.55;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* Зерно поверх всего: бумага, а не экранная заливка. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  pointer-events: none;
+  background-image: var(--grain);
+  opacity: 0.085;
 }
 
 a {
   color: inherit;
   text-decoration: none;
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+::selection {
+  background: var(--ink);
+  color: var(--paper-raised);
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/*
+ * Одна оркестрованная сборка страницы: элементы проявляются по очереди
+ * по индексу --i. Ступень одна на всю страницу, микроэффектов по мелочи нет.
+ */
+@media (prefers-reduced-motion: no-preference) {
+  .reveal {
+    opacity: 0;
+    animation: reveal var(--dur-slow) var(--ease-out-expo) forwards;
+    animation-delay: calc(var(--i, 0) * 70ms);
+  }
+}
+
+@keyframes reveal {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 14px, 0);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
