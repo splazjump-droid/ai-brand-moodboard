@@ -73,7 +73,7 @@
 - [ ] **Step 1: Создать проект**
 
 ```bash
-cd "/Users/artemfrolov/Desktop/ai brand moodboard"
+cd ~/dev/ai-brand-moodboard
 npx create-next-app@latest . --typescript --app --eslint --no-tailwind --no-src-dir --import-alias "@/*" --use-npm
 ```
 
