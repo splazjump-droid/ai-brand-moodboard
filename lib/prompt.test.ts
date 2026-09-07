@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { buildSystemPrompt, buildUserMessage } from "./prompt";
 import { GENERATED_FIELDS, KEYWORDS } from "./directions-schema";
 import { DIRECTIONS, directionsByTier } from "./catalog";
+import { AESTHETIC_CHIPS, CHARACTER_CHIPS } from "./vocab";
 
 const prompt = buildSystemPrompt(DIRECTIONS);
 
@@ -52,5 +53,22 @@ describe("сообщение пользователя", () => {
   it("подписывает поля по-русски", () => {
     const msg = buildUserMessage({ brand: "Кофейня «Зерно»", avoid: "без мешковины" });
     expect(msg).toContain("Чего избегать: без мешковины");
+  });
+
+  // Чипы работают сужением каталога, в сообщение они не уезжают: id «bold»
+  // столкнулся бы с уровнем риска bold из системного промпта.
+  it("не уносит идентификаторы чипов в сообщение", () => {
+    const msg = buildUserMessage({
+      brand: "Кофейня «Зерно»",
+      characterChips: CHARACTER_CHIPS.map((c) => c.id),
+      characterFree: "по-соседски",
+      aestheticChips: AESTHETIC_CHIPS.map((c) => c.id),
+    });
+
+    // Свободный текст на месте: сообщение не пустое и проверка не вхолостую.
+    expect(msg).toContain("по-соседски");
+    for (const chip of [...CHARACTER_CHIPS, ...AESTHETIC_CHIPS]) {
+      expect(msg, chip.id).not.toContain(chip.id);
+    }
   });
 });

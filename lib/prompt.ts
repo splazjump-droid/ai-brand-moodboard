@@ -65,25 +65,23 @@ ${catalogue}
 «индивидуальный подход», «современный и стильный», «динамичный бренд».`;
 }
 
+// Чипов здесь нет намеренно: их работа сделана сужением каталога,
+// в сообщение они не уезжают. Идентификатор bold — это «дерзкий», а в
+// системном промпте bold уже значит уровень риска; модель бы читала
+// «Характер: bold» рядом с «bold: заметное решение с характером».
+// Поле без подписи в сообщение не попадает вовсе.
 const LABELS: Record<string, string> = {
   brand: BRIEF_FIELDS.brand.label,
   audience: BRIEF_FIELDS.audience.label,
-  characterChips: "Характер, выбранные слова",
   characterFree: BRIEF_FIELDS.characterFree.label,
-  aestheticChips: "Эстетика, выбранные слова",
   aestheticFree: BRIEF_FIELDS.aestheticFree.label,
   avoid: BRIEF_FIELDS.avoid.label,
 };
 
-/** Бриф человеку понятным текстом. Пустые поля отсекает сама функция. */
+/** Бриф человеку понятным текстом. Поля без подписи и пустые отсекает сама функция. */
 export function buildUserMessage(brief: Partial<Brief>): string {
   return Object.entries(brief)
-    .filter(([, value]) =>
-      Array.isArray(value) ? value.length > 0 : typeof value === "string" && value.trim().length > 0
-    )
-    .map(([key, value]) => {
-      const text = Array.isArray(value) ? value.join(", ") : value;
-      return `${LABELS[key] ?? key}: ${text}`;
-    })
+    .filter(([key, value]) => key in LABELS && typeof value === "string" && value.trim().length > 0)
+    .map(([key, value]) => `${LABELS[key]}: ${value}`)
     .join("\n");
 }
