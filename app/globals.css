@@ -57,8 +57,10 @@ textarea {
   color: inherit;
 }
 
+/* Чернильный фокус — правило всей оболочки, а не отделка отдельных полей:
+   красный в форме читается ошибкой, а обводка её не означает. */
 :focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--focus);
   outline-offset: 3px;
 }
 

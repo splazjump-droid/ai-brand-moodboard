@@ -1,6 +1,6 @@
 import type { CSSProperties } from "react";
 
-import { findDirection, findFontPair, findPalette } from "@/lib/catalog";
+import { findDirection, findFontPair, findPalette, TIERS } from "@/lib/catalog";
 import type { GeneratedDirection } from "@/lib/directions-schema";
 
 import "@/styles/direction-card.css";
@@ -14,7 +14,7 @@ const TIER_LABEL = {
 
 const TIER_RISK = { safe: 1, bold: 2, experimental: 3 } as const;
 
-const RISK_SLOTS = [1, 2, 3];
+const RISK_SLOTS = TIERS.map((tier) => TIER_RISK[tier]);
 
 /**
  * Шрифты бренда тянутся с Google Fonts по требованию: держать в проекте
@@ -79,7 +79,7 @@ export function DirectionCard({ direction }: { direction: GeneratedDirection }) 
         {catalogName && <p className="direction-origin">{catalogName}</p>}
         <p className="direction-risk">
           <span className="visually-hidden">
-            Уровень риска {TIER_RISK[direction.tier]} из 3
+            Уровень риска {TIER_RISK[direction.tier]} из {TIERS.length}
           </span>
           {RISK_SLOTS.map((slot) => (
             <span

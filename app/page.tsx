@@ -40,6 +40,18 @@ export default function Home() {
         </p>
       </header>
 
+      {/* Живая область смонтирована всегда и пуста до первой карточки:
+          область, пришедшая в DOM вместе со своим первым значением,
+          скринридером обычно не объявляется, а первое значение здесь и есть
+          сообщение. Видимый счёт ниже говорит то же самое глазами и потому
+          от озвучки скрыт. В ошибке область молчит: там говорит сама ошибка. */}
+      <p className="visually-hidden" aria-live="polite">
+        {status === "streaming" || status === "done"
+          ? `${directions.length} из ${TIERS.length}, ` +
+            (streaming ? "собираем направления" : "направления собраны")
+          : ""}
+      </p>
+
       {status === "idle" ? (
         <BriefForm
           brief={brief}
@@ -52,14 +64,13 @@ export default function Home() {
           <BriefSummary brief={brief} onEdit={reset} />
 
           {/* Спиннера нет: карточки приходят по одной, это и есть индикация.
-              Счёт рядом — для тех, кто страницу слушает, а не смотрит.
               В ошибке счёт молчит: там говорит сама ошибка. */}
           {status !== "error" && (
-            <p className="result-progress" aria-live="polite">
+            <p className="result-progress" aria-hidden="true">
               <span className="result-progress-count">
                 {directions.length} из {TIERS.length}
               </span>
-              <span className="result-progress-slots" aria-hidden="true">
+              <span className="result-progress-slots">
                 {TIERS.map((tier, i) => (
                   <span
                     key={tier}
