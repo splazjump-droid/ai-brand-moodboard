@@ -4,6 +4,8 @@
 // Обе функции принимают накопленный буфер и возвращают то, что удалось
 // разобрать целиком, плюс остаток буфера — для следующего вызова.
 
+import { closeJsonBraces } from "./json-repair";
+
 export interface SectionChunk {
   section: string;
   data: unknown;
@@ -53,6 +55,34 @@ export function parseSSEBuffer(buffer: string): {
 }
 
 /**
+ * Разбирает одну строку в секцию. Если строка не сложилась в JSON, идёт вторая
+ * попытка — с дописанными закрывающими скобками: модель иногда не ставит
+ * последнюю (см. lib/json-repair.ts). Не сложилось и так — null, строка молча
+ * отбрасывается, как и раньше.
+ */
+function parseSectionLine(line: string): SectionChunk | null {
+  for (const candidate of [line, closeJsonBraces(line)]) {
+    if (candidate === null) continue;
+
+    try {
+      const parsed = JSON.parse(candidate);
+      if (
+        parsed &&
+        typeof parsed === "object" &&
+        typeof parsed.section === "string" &&
+        "data" in parsed
+      ) {
+        return { section: parsed.section, data: parsed.data };
+      }
+    } catch {
+      // Строка ещё не собралась в валидный JSON или это мусор — следующая попытка.
+    }
+  }
+
+  return null;
+}
+
+/**
  * Собирает построчный JSON (одна строка — один объект {section, data})
  * в разобранные секции. Пустые и мусорные строки, а также строки,
  * которые ещё не сложились в валидный JSON, молча пропускаются.
@@ -70,19 +100,8 @@ export function parseSectionBuffer(buffer: string): {
     const line = rawLine.trim();
     if (!line) continue;
 
-    try {
-      const parsed = JSON.parse(line);
-      if (
-        parsed &&
-        typeof parsed === "object" &&
-        typeof parsed.section === "string" &&
-        "data" in parsed
-      ) {
-        sections.push({ section: parsed.section, data: parsed.data });
-      }
-    } catch {
-      // Строка ещё не собралась в валидный JSON или это мусор — пропускаем.
-    }
+    const section = parseSectionLine(line);
+    if (section) sections.push(section);
   }
 
   return { sections, remainder };
