@@ -77,7 +77,7 @@
     "tier": "experimental",
     "keywords": ["вырезка", "слои", "плёнка", "шум", "рукотворность"],
     "language": "Cut-and-paste collage maximalism. Scanned paper edges, layered photographic fragments, halftone and grain, mixed type sizes inside one line, controlled visual noise.",
-    "paletteIds": ["generative-art-platform", "marketing-agency", "pet-tech-app"],
+    "paletteIds": ["generative-art-platform", "recipe-cooking-app", "pet-tech-app"],
     "fontPairIds": ["condensed-poster", "display-heavy"]
   }
 ]

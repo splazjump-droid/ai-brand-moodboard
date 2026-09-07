@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { DIRECTIONS, TIERS, findDirection, directionsByTier } from "./index";
 import { findPalette, findFontPair } from "./index";
+import type { Palette } from "./index";
 
 describe("каталог направлений", () => {
   it("девять направлений, по три на каждый уровень риска", () => {
@@ -61,21 +62,48 @@ describe("каталог направлений", () => {
     expect(findDirection("нет-такого")).toBeUndefined();
   });
 
-  it("палитра принадлежит ровно одному направлению", () => {
+  it("двум направлениям не достаётся один и тот же набор цветов", () => {
     // Живой прогон 2026-09-07: Safe и Experimental выбрали одну и ту же
-    // magazine-blog и отрисовались одинаково. Запрет на пересечение списков
-    // этого не ловил — направления делили ровно одну палитру и обе её взяли.
-    // Пока палитра числится у двух направлений, совпадение возможно, поэтому
-    // проверяется владение, а не размер пересечения.
-    const owners = new Map<string, string[]>();
+    // magazine-blog и отрисовались одинаково. Сравнивается цветовой состав,
+    // а не id: в palettes.json 23 группы палитр-близнецов — разные id и
+    // названия, но все цветовые поля совпадают байт в байт (creative-agency
+    // и marketing-agency, например). Проверка владения по идентификатору
+    // таких не видит: направления берут разные строки, а карточки выходят
+    // пиксель в пиксель одинаковыми.
+    const swatch = (p: Palette) =>
+      [
+        p.primary,
+        p.onPrimary,
+        p.accent,
+        p.onAccent,
+        p.background,
+        p.foreground,
+        p.muted,
+        p.mutedForeground,
+        p.border,
+      ]
+        .map((c) => c.toUpperCase())
+        .join(" ");
+
+    const seen = new Map<string, { direction: string; palette: string }>();
+    const clashes: string[] = [];
     for (const d of DIRECTIONS) {
-      for (const id of d.paletteIds) owners.set(id, [...(owners.get(id) ?? []), d.id]);
+      for (const id of d.paletteIds) {
+        const palette = findPalette(id);
+        if (!palette) continue; // несуществующие ловит соседний тест
+        const colors = swatch(palette);
+        const first = seen.get(colors);
+        if (first) {
+          clashes.push(
+            `${first.palette} (направление ${first.direction}) и ${id} (направление ${d.id}) — ` +
+              `совпадают все цвета: ${colors}. Убрать одну из двух и добрать свободную.`,
+          );
+        } else {
+          seen.set(colors, { direction: d.id, palette: id });
+        }
+      }
     }
-    const shared = [...owners].filter(([, ids]) => ids.length > 1);
-    expect(
-      shared.map(([palette, ids]) => `${palette} у ${ids.join(", ")}`),
-      "палитру делят несколько направлений",
-    ).toEqual([]);
+    expect(clashes, "два направления отрисуются в одинаковых цветах").toEqual([]);
   });
 
   it("направления с разных уровней не делят больше одной пары шрифтов", () => {
