@@ -1,4 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+
+import { zerno } from "@/lib/fixtures/zerno";
 
 // Очередь значений incr на тест про лимит. Пусто — счётчик отдаёт 1,
 // как и раньше: остальные тесты про лимит ничего не знают.
@@ -28,20 +30,26 @@ const post = async (body: unknown) => {
  * переводом строки, и внутри него последняя строка построчного JSON —
  * тоже: ровно так обрывается настоящий ответ. Оба хвоста должны быть
  * дочитаны после цикла, иначе третье направление теряется.
+ *
+ * Данные берём из фикстуры витрины: они проходят GeneratedDirectionSchema,
+ * а маршруту теперь важно отличать прошедшее схему от просто пришедшего.
  */
-function sseStream(): ReadableStream<Uint8Array> {
+function sseStream(directions: unknown[] = zerno.directions): ReadableStream<Uint8Array> {
   const frame = (content: string) =>
     `data: ${JSON.stringify({ choices: [{ delta: { content } }] })}`;
 
+  const lines = directions.map((data) => JSON.stringify({ section: "direction", data }));
+
   const body =
-    `${frame('{"section":"direction","data":{"id":"safe"}}\n')}\n\n` +
-    `${frame('{"section":"direction","data":{"id":"bold"}}\n')}\n\n` +
+    `${frame(`${lines[0]}\n`)}\n\n` +
+    `${frame(`${lines[1]}\n`)}\n\n` +
     // Ни "\n\n" после кадра, ни "\n" после самого JSON.
-    frame('{"section":"direction","data":{"id":"experimental"}}');
+    frame(lines[2]);
 
   const encoder = new TextEncoder();
   // Режем на куски мимо границ строк — так же, как приходит из сети.
-  const parts = [body.slice(0, 40), body.slice(40, 150), body.slice(150)];
+  const third = Math.ceil(body.length / 3);
+  const parts = [body.slice(0, third), body.slice(third, third * 2), body.slice(third * 2)];
 
   return new ReadableStream({
     start(controller) {
@@ -72,6 +80,10 @@ beforeEach(() => {
   });
 });
 
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
 describe("POST /api/directions", () => {
   it("на нечитаемом теле отвечает 400 и текстом по-русски", async () => {
     const res = await post("не json");
@@ -94,6 +106,14 @@ describe("POST /api/directions", () => {
     expect(res.status).toBe(400);
   });
 
+  it("на чипе не из словаря отвечает 400, а не уносит строку в промпт", async () => {
+    const res = await post({
+      brand: "уютная кофейня в центре города",
+      characterChips: ["я".repeat(5000)],
+    });
+    expect(res.status).toBe(400);
+  });
+
   it("без APP_SALT отвечает 500, а не считает хеш по undefined", async () => {
     delete process.env.APP_SALT;
     const res = await post({ brand: "уютная кофейня в центре города" });
@@ -112,10 +132,11 @@ describe("POST /api/directions", () => {
     const brief = { brand: "уютная кофейня в центре города" };
 
     // Лимит пропустил — значит дошли до вызова апстрима, а там стоит
-    // запрещающий global.fetch: наружу запрос не уходит, но и 429 не
-    // возвращается. Ровно это и надо доказать про первые два прохода.
-    await expect(post(brief)).rejects.toThrow("fetch в тестах запрещён");
-    await expect(post(brief)).rejects.toThrow("fetch в тестах запрещён");
+    // запрещающий global.fetch: наружу запрос не уходит, маршрут отвечает
+    // 502. Важно, что не 429: первые два прохода лимит пропускает.
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    expect((await post(brief)).status).toBe(502);
+    expect((await post(brief)).status).toBe(502);
 
     const third = await post(brief);
     expect(third.status).toBe(429);
@@ -130,10 +151,55 @@ describe("POST /api/directions", () => {
     expect(res.status).toBe(200);
 
     const sections = await readSections(res);
-    expect(sections.map((s) => (s.data as { id: string }).id)).toEqual([
+    expect(sections.map((s) => (s.data as { tier: string }).tier)).toEqual([
       "safe",
       "bold",
       "experimental",
     ]);
+  });
+
+  // Ради этого сценария лог и написан: секций три, схему не прошла ни одна,
+  // человек видит пустой экран и не досчитывается прохода.
+  it("пишет в лог расхождение, когда секции пришли, а схему не прошли", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    // Концепция длиннее верхней границы: маршрут секцию отдаёт, клиент её
+    // отбросит.
+    const broken = zerno.directions.map((d) => ({ ...d, concept: "я".repeat(500) }));
+    global.fetch = vi.fn().mockResolvedValue(new Response(sseStream(broken), { status: 200 }));
+
+    const res = await post({ brand: "уютная кофейня в центре города" });
+    expect(await readSections(res)).toHaveLength(3);
+    expect(log).toHaveBeenCalledWith(expect.stringContaining("схему прошло 0/3"));
+  });
+
+  it("на исправном потоке в лог не пишет", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    global.fetch = vi.fn().mockResolvedValue(new Response(sseStream(), { status: 200 }));
+
+    const res = await post({ brand: "уютная кофейня в центре города" });
+    await readSections(res);
+    expect(log).not.toHaveBeenCalled();
+  });
+
+  it("сетевой сбой апстрима отдаёт 502, а не падает исключением", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    global.fetch = vi.fn().mockRejectedValue(
+      Object.assign(new TypeError("fetch failed"), { cause: new Error("ENOTFOUND polza.ai") })
+    );
+
+    const res = await post({ brand: "уютная кофейня в центре города" });
+    expect(res.status).toBe(502);
+    expect(log).toHaveBeenCalledWith(expect.stringContaining("ENOTFOUND"));
+  });
+
+  it("уход посетителя со страницы в лог ошибок не пишет", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    const aborted = new Error("The operation was aborted.");
+    aborted.name = "AbortError";
+    global.fetch = vi.fn().mockRejectedValue(aborted);
+
+    const res = await post({ brand: "уютная кофейня в центре города" });
+    expect(res.status).toBe(502);
+    expect(log).not.toHaveBeenCalled();
   });
 });

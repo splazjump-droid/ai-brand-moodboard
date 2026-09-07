@@ -2,6 +2,8 @@ import { BriefSchema, stripEmpty } from "@/lib/brief-schema";
 import { buildSystemPrompt, buildUserMessage } from "@/lib/prompt";
 import { parseSSEBuffer, parseSectionBuffer } from "@/lib/stream";
 import { directionsByTier, TIERS } from "@/lib/catalog";
+import { GeneratedDirectionSchema } from "@/lib/directions-schema";
+import { DIRECTIONS_FAILED } from "@/lib/messages";
 import { directionsForChips } from "@/lib/vocab";
 import { extractIp, ipHash, isOverLimit, limitKey } from "@/lib/rate-limit";
 import { redis, DAY_SECONDS } from "@/lib/redis";
@@ -100,39 +102,50 @@ export async function POST(req: Request) {
     return picked.length ? picked : directionsByTier(tier);
   });
 
-  const upstream = await fetch(ENDPOINT, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      authorization: `Bearer ${polzaApiKey}`,
-    },
-    body: JSON.stringify({
-      model: MODEL,
-      // Текст трёх направлений занимает около 1200 токенов, остальное
-      // съедают рассуждения модели перед ответом. Платим за
-      // использованные токены, а не за потолок, поэтому запас бесплатен.
-      max_tokens: 6000,
-      stream: true,
-      messages: [
-        {
-          role: "system",
-          content: buildSystemPrompt(directions),
-        },
-        { role: "user", content: buildUserMessage(brief) },
-      ],
-    }),
-    // Клиент ушёл со страницы — рвём запрос к модели, не дочитываем
-    // и не оплачиваем токены впустую.
-    signal: req.signal,
-  });
+  let upstream: Response;
+  try {
+    upstream = await fetch(ENDPOINT, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${polzaApiKey}`,
+      },
+      body: JSON.stringify({
+        model: MODEL,
+        // Текст трёх направлений занимает около 1200 токенов, остальное
+        // съедают рассуждения модели перед ответом. Платим за
+        // использованные токены, а не за потолок, поэтому запас бесплатен.
+        max_tokens: 6000,
+        stream: true,
+        messages: [
+          {
+            role: "system",
+            content: buildSystemPrompt(directions),
+          },
+          { role: "user", content: buildUserMessage(brief) },
+        ],
+      }),
+      // Клиент ушёл со страницы — рвём запрос к модели, не дочитываем
+      // и не оплачиваем токены впустую.
+      signal: req.signal,
+    });
+  } catch (error) {
+    // Уход посетителя со страницы рвёт этот же запрос через req.signal.
+    // Ответ уже некому читать, но в логе ошибок закрытой вкладке не место:
+    // иначе настоящие отказы сети утонут среди ушедших посетителей.
+    // Причина без тела ответа: у обрыва и таймаута она лежит в cause,
+    // а тело апстрима может содержать эхо ключа.
+    if (!(error instanceof Error && error.name === "AbortError")) {
+      const cause = error instanceof Error ? (error.cause ?? error) : error;
+      console.error(`[directions] апстрим недоступен: ${String(cause)}`);
+    }
+    return Response.json({ error: DIRECTIONS_FAILED }, { status: 502 });
+  }
 
   if (!upstream.ok || !upstream.body) {
     // Только статус: тело ответа апстрима может содержать эхо ключа.
     console.error(`[directions] апстрим ответил ${upstream.status}`);
-    return Response.json(
-      { error: "Не удалось собрать направления. Попробуйте ещё раз." },
-      { status: 502 }
-    );
+    return Response.json({ error: DIRECTIONS_FAILED }, { status: 502 });
   }
 
   const encoder = new TextEncoder();
@@ -149,11 +162,18 @@ export async function POST(req: Request) {
       let textBuffer = "";
       let finishReason: string | null = null;
       let delivered = 0;
+      let valid = 0;
 
+      // Клиенту уходит всё: накопление на той стороне устойчиво к мусору,
+      // и решать, что показывать, должно оно. А считаем прошедшее схему:
+      // маршрут, который рапортует об успехе на ответе, отбракованном
+      // клиентом до последней карточки, бесполезен как место, куда смотрят.
       const flush = (sections: { section: string; data: unknown }[]) => {
         for (const chunk of sections) {
           controller.enqueue(encoder.encode(`${JSON.stringify(chunk)}\n`));
           delivered++;
+          if (chunk.section === "direction" && GeneratedDirectionSchema.safeParse(chunk.data).success)
+            valid++;
         }
       };
 
@@ -184,11 +204,13 @@ export async function POST(req: Request) {
           finishReason = tail.finishReason ?? finishReason;
           flush(parseSectionBuffer(`${textBuffer}\n`).sections);
 
-          if (delivered < 3) {
+          if (valid < TIERS.length) {
             // Обрыв генерации и несошедшаяся схема для человека выглядят
-            // одинаково. Причину видно только здесь.
+            // одинаково: пустой экран и потраченный проход. Различает их
+            // только расхождение между «пришло» и «прошло схему».
             console.error(
-              `[directions] пришло ${delivered}/3, finish_reason: ${finishReason ?? "не пришёл"}`
+              `[directions] секций ${delivered}, схему прошло ${valid}/${TIERS.length},` +
+                ` finish_reason: ${finishReason ?? "не пришёл"}`
             );
           }
 
@@ -200,7 +222,11 @@ export async function POST(req: Request) {
         if (!cancelled) {
           try {
             controller.error(error);
-          } catch {}
+          } catch {
+            // Контроллер уже мёртв: посетителю мы ничего не скажем,
+            // но молчать в логе о потерянном потоке нельзя.
+            console.error("[directions] поток закрылся до сообщения об ошибке");
+          }
         }
       } finally {
         reader.releaseLock();

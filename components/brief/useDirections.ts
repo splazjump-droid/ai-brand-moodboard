@@ -5,10 +5,9 @@ import type { Brief } from "@/lib/brief-schema";
 import type { GeneratedDirection } from "@/lib/directions-schema";
 import { parseSectionBuffer } from "@/lib/stream";
 import { accumulate, isComplete } from "@/lib/directions-state";
+import { DIRECTIONS_FAILED } from "@/lib/messages";
 
 type Status = "idle" | "streaming" | "done" | "error";
-
-const GENERIC = "Не удалось собрать направления. Попробуйте ещё раз.";
 
 /**
  * Тонкая обёртка вокруг запроса и чистой функции accumulate.
@@ -41,7 +40,7 @@ export function useDirections() {
       // Свой текст маршрута (400, 429, 502) доходит до человека как есть:
       // «на сегодня хватит» и «расскажите о бренде» — разные починки.
       const data = await res.json().catch(() => ({}));
-      setError(data.error ?? GENERIC);
+      setError(data.error ?? DIRECTIONS_FAILED);
       setStatus("error");
       return;
     }
@@ -88,7 +87,7 @@ export function useDirections() {
 
     if (isComplete(current)) setStatus("done");
     else {
-      setError(GENERIC);
+      setError(DIRECTIONS_FAILED);
       setStatus("error");
     }
   }
