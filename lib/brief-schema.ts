@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { isChipId } from "./vocab";
+
 // Границы длины текстовых полей живут здесь и только здесь: из них
 // собирается промпт и по ним валидируется вход. Иначе промпт разъезжается
 // со схемой.
@@ -19,12 +21,22 @@ export const BRIEF_FIELDS = {
  */
 export const MAX_CHIPS = 8;
 
+/**
+ * Чипы приходят из закрытого словаря, произвольных значений в них не
+ * бывает. Проверяем по словарю, а не по длине строки: иначе запрос мимо
+ * формы уносит в тело запроса к модели восемь строк любого размера —
+ * и токены, и подмешанные инструкции.
+ */
+const chipIds = z.array(z.string().refine(isChipId)).max(MAX_CHIPS).optional();
+
 export const BriefSchema = z.object({
-  brand: z.string().min(BRIEF_FIELDS.brand.min).max(BRIEF_FIELDS.brand.max),
+  // trim до проверки длины: триста пробелов и слово «кофе» иначе проходят
+  // min и уезжают в промпт четырьмя знаками.
+  brand: z.string().trim().min(BRIEF_FIELDS.brand.min).max(BRIEF_FIELDS.brand.max),
   audience: z.string().max(BRIEF_FIELDS.audience.max).optional(),
-  characterChips: z.array(z.string()).max(MAX_CHIPS).optional(),
+  characterChips: chipIds,
   characterFree: z.string().max(BRIEF_FIELDS.characterFree.max).optional(),
-  aestheticChips: z.array(z.string()).max(MAX_CHIPS).optional(),
+  aestheticChips: chipIds,
   aestheticFree: z.string().max(BRIEF_FIELDS.aestheticFree.max).optional(),
   avoid: z.string().max(BRIEF_FIELDS.avoid.max).optional(),
 });

@@ -37,3 +37,8 @@ export function directionsForChips(chipIds: string[]): Direction[] {
   }
   return DIRECTIONS.filter((d) => ids.has(d.id));
 }
+
+/** Известен ли идентификатор чипа. Словарь закрытый: посторонних значений не бывает. */
+export function isChipId(id: string): boolean {
+  return BY_ID.has(id);
+}
