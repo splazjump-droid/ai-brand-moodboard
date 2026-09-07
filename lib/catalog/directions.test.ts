@@ -32,7 +32,8 @@ describe("каталог направлений", () => {
 
   it("каждое направление называет существующие палитры", () => {
     for (const d of DIRECTIONS) {
-      expect(d.paletteIds.length, d.id).toBeGreaterThanOrEqual(2);
+      // Меньше трёх — это уже не выбор: модель берёт палитру только из списка.
+      expect(d.paletteIds.length, d.id).toBeGreaterThanOrEqual(3);
       for (const id of d.paletteIds) {
         expect(findPalette(id), `${d.id} ссылается на неизвестную палитру ${id}`).toBeDefined();
       }
@@ -60,16 +61,31 @@ describe("каталог направлений", () => {
     expect(findDirection("нет-такого")).toBeUndefined();
   });
 
-  it("направления с разных уровней не делят больше одной палитры и одной пары шрифтов", () => {
-    // В одной генерации берётся по одному направлению на уровень. Если пара
-    // с разных уровней делит пул ресурсов, карточки Safe и Bold рискуют
-    // отрисоваться одинаковыми — а различать их должна структура, не текст.
+  it("палитра принадлежит ровно одному направлению", () => {
+    // Живой прогон 2026-09-07: Safe и Experimental выбрали одну и ту же
+    // magazine-blog и отрисовались одинаково. Запрет на пересечение списков
+    // этого не ловил — направления делили ровно одну палитру и обе её взяли.
+    // Пока палитра числится у двух направлений, совпадение возможно, поэтому
+    // проверяется владение, а не размер пересечения.
+    const owners = new Map<string, string[]>();
+    for (const d of DIRECTIONS) {
+      for (const id of d.paletteIds) owners.set(id, [...(owners.get(id) ?? []), d.id]);
+    }
+    const shared = [...owners].filter(([, ids]) => ids.length > 1);
+    expect(
+      shared.map(([palette, ids]) => `${palette} у ${ids.join(", ")}`),
+      "палитру делят несколько направлений",
+    ).toEqual([]);
+  });
+
+  it("направления с разных уровней не делят больше одной пары шрифтов", () => {
+    // В одной генерации берётся по одному направлению на уровень. Общий пул
+    // шрифтов у пары с разных уровней сближает карточки Safe и Bold, а
+    // различать их должна структура, не текст.
     for (const a of DIRECTIONS) {
       for (const b of DIRECTIONS) {
         if (a.tier === b.tier || a.id >= b.id) continue;
-        const palettes = a.paletteIds.filter((p) => b.paletteIds.includes(p));
         const fonts = a.fontPairIds.filter((f) => b.fontPairIds.includes(f));
-        expect(palettes.length, `${a.id} и ${b.id} делят палитры: ${palettes}`).toBeLessThanOrEqual(1);
         expect(fonts.length, `${a.id} и ${b.id} делят пары шрифтов: ${fonts}`).toBeLessThanOrEqual(1);
       }
     }
