@@ -36,9 +36,16 @@
 
 /* Линейка под шапкой идёт от края до края рамки: в наборе это отбивка
    листа, а не подчёркивание строки. Отрицание функции — только через calc. */
+
+/* Сетка, а не перенос по месту. Три карточки стоят рядом, и на переносе
+   шапка одной оказывалась выше соседних: «EXPERIMENTAL» длиннее «SAFE»
+   на треть строки, места на шкалу риска не оставалось, и она съезжала
+   под подпись. Теперь строк ровно две при любой длине — уровень со шкалой
+   сверху, название направления из каталога снизу. Шапки совпадают по
+   высоте, шкалы стоят на одной линии, а название читается целиком. */
 .direction-head {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--step-1) var(--step-3);
   margin-inline: calc(-1 * var(--card-pad));
@@ -49,6 +56,7 @@
 }
 
 .direction-tier {
+  grid-area: 1 / 1;
   display: flex;
   align-items: center;
   font-family: var(--type-display);
@@ -69,6 +77,7 @@
 
 /* Тот же кегль, противоположное начертание — как в шапке страницы. */
 .direction-origin {
+  grid-area: 2 / 1 / 3 / -1;
   min-inline-size: 0;
   font-family: var(--type-display);
   font-weight: 200;
@@ -78,9 +87,9 @@
 }
 
 .direction-risk {
+  grid-area: 1 / 2;
   display: flex;
   gap: 3px;
-  margin-inline-start: auto;
 }
 
 .direction-risk-slot {

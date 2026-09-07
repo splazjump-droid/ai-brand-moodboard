@@ -67,6 +67,19 @@ export function useDirections() {
           setDirections(current);
         }
       }
+
+      // Тот же хвост, что дочитывает маршрут у своего апстрима. Сегодня
+      // маршрут заканчивает каждую секцию переводом строки, но держаться
+      // на этом — значит терять третье направление в тот день, когда
+      // перевод строки уберут. Пустой остаток ничего не меняет.
+      buffer += decoder.decode();
+      if (buffer.trim()) {
+        const sections = parseSectionBuffer(`${buffer}\n`).sections;
+        if (sections.length) {
+          current = accumulate(current, sections);
+          setDirections(current);
+        }
+      }
     } catch {
       setError("Соединение прервалось во время сборки. Попробуйте ещё раз.");
       setStatus("error");
