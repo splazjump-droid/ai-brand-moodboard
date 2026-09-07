@@ -29,6 +29,7 @@ describe("хеш адреса", () => {
 describe("потолок", () => {
   it("мусор в переменной окружения даёт значение по умолчанию 2", () => {
     expect(parseDailyLimit(undefined)).toBe(2);
+    expect(parseDailyLimit("")).toBe(2);
     expect(parseDailyLimit("не число")).toBe(2);
     expect(parseDailyLimit("0")).toBe(2);
     expect(parseDailyLimit("-5")).toBe(2);

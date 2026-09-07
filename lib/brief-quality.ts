@@ -36,5 +36,8 @@ export function briefFullness(brief: Partial<Brief>): {
   else if (!chosen(brief.aestheticChips, brief.aestheticFree)) note = "Выберите эстетику";
   else if (!brief.avoid?.trim()) note = "Можно добавить, чего избегать";
 
+  // Веса дают в сумме единицу на бумаге, но в двоичной дроби полный бриф
+  // считается как 1.0000000000000002. Из ratio растёт полоска и процент,
+  // так что потолок здесь настоящий, а не оборонительный.
   return { ratio: Math.min(ratio, 1), level, note };
 }

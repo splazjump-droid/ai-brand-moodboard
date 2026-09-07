@@ -24,6 +24,7 @@ describe("индикатор полноты брифа", () => {
     expect(r.ratio).toBeGreaterThan(0.7);
   });
 
+  // Сторожит Math.min: без него полный бриф даёт 1.0000000000000002.
   it("доля никогда не превышает единицу", () => {
     const r = briefFullness({
       brand: "я".repeat(600),
