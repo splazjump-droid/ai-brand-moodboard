@@ -3,6 +3,52 @@ import { DIRECTIONS, TIERS, findDirection, directionsByTier } from "./index";
 import { findPalette, findFontPair } from "./index";
 import type { Palette } from "./index";
 
+/** Оттенок, насыщенность и светлота из hex. Порог слопа задан в этих числах. */
+function hsl(hex: string): { hue: number; saturation: number; lightness: number } {
+  const n = parseInt(hex.replace("#", ""), 16);
+  const [r, g, b] = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((c) => c / 255);
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const lightness = (max + min) / 2;
+  const span = max - min;
+  if (span === 0) return { hue: 0, saturation: 0, lightness };
+  const saturation = span / (1 - Math.abs(2 * lightness - 1));
+  const hue =
+    max === r
+      ? ((g - b) / span) % 6
+      : max === g
+        ? (b - r) / span + 2
+        : (r - g) / span + 4;
+  return { hue: ((hue * 60) % 360 + 360) % 360, saturation, lightness };
+}
+
+/** Кратчайшее расстояние между оттенками по кругу. */
+function hueGap(a: number, b: number): number {
+  const d = Math.abs(a - b) % 360;
+  return Math.min(d, 360 - d);
+}
+
+/**
+ * Фиолетовое на белом — маркер AI-слопа номер один, правилами проекта
+ * запрещён. Признак считается из цветов, а не из имени палитры: насыщенный
+ * пурпур или розовый на почти белом фоне, и при этом акцент рядом по
+ * оттенку, то есть второго цвета в палитре нет. Мемфис держится на розовом
+ * с далёким акцентом и под правило не попадает намеренно: слоп — это
+ * пастельная монохромия, а не яркий цвет как таковой.
+ */
+function isSlop(p: Palette): boolean {
+  const primary = hsl(p.primary);
+  const accent = hsl(p.accent);
+  const background = hsl(p.background);
+  return (
+    primary.hue >= 260 &&
+    primary.hue <= 340 &&
+    primary.saturation > 0.35 &&
+    background.lightness > 0.88 &&
+    hueGap(primary.hue, accent.hue) < 120
+  );
+}
+
 describe("каталог направлений", () => {
   it("девять направлений, по три на каждый уровень риска", () => {
     expect(DIRECTIONS).toHaveLength(9);
@@ -50,11 +96,53 @@ describe("каталог направлений", () => {
     }
   });
 
-  it("не тянет запрещённые палитры с фиолетовым на белом", () => {
-    const banned = ["micro-saas", "mental-health-app", "ai-chatbot-platform", "membership-community"];
+  it("не тянет палитры с фиолетовым на белом", () => {
+    // Живой прогон 2026-09-10: карточка Experimental вышла на
+    // subscription-box-service — #D946EF на #FDF4FF, ровно тот AI-слоп,
+    // что запрещён правилами проекта. Тест был зелёным, потому что держал
+    // чёрный список из четырёх имён, а палитр в обороте тридцать. Список
+    // имён проверяет знакомство с четырьмя палитрами, а не цвет на экране;
+    // правило считается из самих цветов и ловит любую, включая будущие.
+    const slop: string[] = [];
     for (const d of DIRECTIONS) {
-      for (const id of d.paletteIds) expect(banned, d.id).not.toContain(id);
+      for (const id of d.paletteIds) {
+        const palette = findPalette(id);
+        if (!palette) continue; // несуществующие ловит соседний тест
+        if (isSlop(palette)) {
+          slop.push(
+            `${id} (направление ${d.id}) — ${palette.primary} на ${palette.background}: ` +
+              `насыщенный пурпур на почти белом без второго цвета. Заменить.`,
+          );
+        }
+      }
     }
+    expect(slop, "на экране окажется фиолетовое на белом").toEqual([]);
+  });
+
+  it("направления с разных уровней не делят акцентный цвет", () => {
+    // Живой прогон 2026-09-10: Safe и Experimental получили один и тот же
+    // #EA580C. Палитры разные целиком, а глаз видит акцент — самый яркий
+    // цвет карточки. Проверять состав целиком мало: совпадения хватает в
+    // одном поле. Внутри уровня совпадение безвредно, в проход уходит одно
+    // направление с уровня.
+    const owners = new Map<string, Map<string, string>>();
+    for (const d of DIRECTIONS) {
+      for (const id of d.paletteIds) {
+        const palette = findPalette(id);
+        if (!palette) continue;
+        const accent = palette.accent.toUpperCase();
+        if (!owners.has(accent)) owners.set(accent, new Map());
+        owners.get(accent)!.set(d.tier, d.id);
+      }
+    }
+    const clashes: string[] = [];
+    for (const [accent, byTier] of owners) {
+      if (byTier.size > 1) {
+        const who = [...byTier].map(([tier, id]) => `${id} (${tier})`).join(", ");
+        clashes.push(`${accent}: ${who} — две карточки одного прохода выйдут с одним акцентом.`);
+      }
+    }
+    expect(clashes, "карточки одного прохода делят акцент").toEqual([]);
   });
 
   it("findDirection находит по id и молчит на неизвестном", () => {

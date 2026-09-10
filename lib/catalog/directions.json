@@ -32,7 +32,7 @@
     "tier": "bold",
     "keywords": ["контраст", "обводка", "плотность", "прямота", "напор"],
     "language": "Neo-brutalism. Thick black outlines, hard offset shadows, oversized type, raw unmodulated colour blocks, deliberate roughness. Loud and unpolished on purpose.",
-    "paletteIds": ["automotive-car-dealership", "photography-studio", "coworking-space"],
+    "paletteIds": ["automotive-car-dealership", "photography-studio", "idle-clicker-game"],
     "fontPairIds": ["condensed-poster", "tech-terminal"]
   },
   {
@@ -50,7 +50,7 @@
     "tier": "bold",
     "keywords": ["круг и квадрат", "диагональ", "первичный цвет", "агитация", "конструкция"],
     "language": "Bauhaus and constructivism. Primary colour on off-white, circle-square-triangle vocabulary, strong diagonals, heavy geometric sans, poster composition with visible structure.",
-    "paletteIds": ["sports-team-club", "saas-general", "crowdfunding-platform", "trivia-quiz-game"],
+    "paletteIds": ["sports-team-club", "parking-finder", "music-instrument-learning", "trivia-quiz-game"],
     "fontPairIds": ["grotesque-clean", "display-heavy"]
   },
   {
@@ -59,7 +59,7 @@
     "tier": "experimental",
     "keywords": ["хром", "глянец", "пузырь", "переливы", "нулевые"],
     "language": "Y2K aesthetic. Liquid chrome, iridescent gradients, bubbly inflated shapes, lens flare, early-web optimism rendered at high gloss.",
-    "paletteIds": ["nft-web3-platform", "quantum-computing-interface", "subscription-box-service"],
+    "paletteIds": ["nft-web3-platform", "quantum-computing-interface", "fintech-crypto"],
     "fontPairIds": ["display-loud", "tech-terminal", "display-heavy"]
   },
   {
@@ -68,7 +68,7 @@
     "tier": "experimental",
     "keywords": ["зигзаг", "крапинка", "асимметрия", "игра", "постмодерн"],
     "language": "Memphis Group postmodernism. Squiggles, confetti dots, terrazzo texture, clashing saturated colour, deliberately unbalanced composition, playful and unserious.",
-    "paletteIds": ["creator-economy-platform", "childcare-daycare", "creative-agency"],
+    "paletteIds": ["biohacking-longevity-app", "childcare-daycare", "creative-agency"],
     "fontPairIds": ["display-heavy", "geometric-soft", "display-loud"]
   },
   {
@@ -77,7 +77,7 @@
     "tier": "experimental",
     "keywords": ["вырезка", "слои", "плёнка", "шум", "рукотворность"],
     "language": "Cut-and-paste collage maximalism. Scanned paper edges, layered photographic fragments, halftone and grain, mixed type sizes inside one line, controlled visual noise.",
-    "paletteIds": ["generative-art-platform", "recipe-cooking-app", "pet-tech-app"],
+    "paletteIds": ["generative-art-platform", "recipe-cooking-app", "diary-journal-app"],
     "fontPairIds": ["condensed-poster", "display-heavy"]
   }
 ]
