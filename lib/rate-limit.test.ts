@@ -1,5 +1,12 @@
-import { describe, it, expect } from "vitest";
-import { extractIp, ipHash, parseDailyLimit, isOverLimit, limitKey } from "./rate-limit";
+import { describe, it, expect, afterEach, vi } from "vitest";
+import {
+  extractIp,
+  ipHash,
+  parseDailyLimit,
+  isLimitConfigured,
+  isOverLimit,
+  limitKey,
+} from "./rate-limit";
 
 describe("извлечение адреса", () => {
   it("берёт первый адрес из списка прокси", () => {
@@ -57,5 +64,59 @@ describe("ключ суток", () => {
     const a = limitKey("abc", new Date("2026-09-03T23:00:00Z"));
     const b = limitKey("abc", new Date("2026-09-04T01:00:00Z"));
     expect(a).not.toBe(b);
+  });
+});
+
+describe("настроенность хранилища лимита", () => {
+  // Обе пары снимаются перед каждой проверкой: окружение разработчика
+  // может содержать любую из них, и тест не должен зависеть от машины.
+  const clear = () => {
+    vi.stubEnv("KV_REST_API_URL", "");
+    vi.stubEnv("KV_REST_API_TOKEN", "");
+    vi.stubEnv("UPSTASH_REDIS_REST_URL", "");
+    vi.stubEnv("UPSTASH_REDIS_REST_TOKEN", "");
+  };
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("без переменных хранилища нет", () => {
+    clear();
+    expect(isLimitConfigured()).toBe(false);
+  });
+
+  it("годится пара от интеграции Vercel", () => {
+    clear();
+    vi.stubEnv("KV_REST_API_URL", "https://пример.upstash.io");
+    vi.stubEnv("KV_REST_API_TOKEN", "токен");
+    expect(isLimitConfigured()).toBe(true);
+  });
+
+  it("годится пара от отдельной установки Upstash", () => {
+    clear();
+    vi.stubEnv("UPSTASH_REDIS_REST_URL", "https://пример.upstash.io");
+    vi.stubEnv("UPSTASH_REDIS_REST_TOKEN", "токен");
+    expect(isLimitConfigured()).toBe(true);
+  });
+
+  it("адрес без токена хранилищем не считается", () => {
+    clear();
+    vi.stubEnv("KV_REST_API_URL", "https://пример.upstash.io");
+    expect(isLimitConfigured()).toBe(false);
+  });
+
+  it("пробелы вместо значения не считаются заданным", () => {
+    clear();
+    vi.stubEnv("KV_REST_API_URL", "   ");
+    vi.stubEnv("KV_REST_API_TOKEN", "   ");
+    expect(isLimitConfigured()).toBe(false);
+  });
+
+  it("половины из разных пар вместе хранилищем не становятся", () => {
+    clear();
+    vi.stubEnv("KV_REST_API_URL", "https://пример.upstash.io");
+    vi.stubEnv("UPSTASH_REDIS_REST_TOKEN", "токен");
+    expect(isLimitConfigured()).toBe(false);
   });
 });

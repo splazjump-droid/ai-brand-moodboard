@@ -5,7 +5,7 @@ import { directionsByTier, TIERS } from "@/lib/catalog";
 import { GeneratedDirectionSchema } from "@/lib/directions-schema";
 import { DIRECTIONS_FAILED } from "@/lib/messages";
 import { directionsForChips } from "@/lib/vocab";
-import { extractIp, ipHash, isOverLimit, limitKey } from "@/lib/rate-limit";
+import { extractIp, ipHash, isLimitConfigured, isOverLimit, limitKey } from "@/lib/rate-limit";
 import { redis, DAY_SECONDS } from "@/lib/redis";
 
 export const runtime = "nodejs";
@@ -67,17 +67,34 @@ export async function POST(req: Request) {
   const hash = ipHash(ip, appSalt);
   const key = limitKey(hash, new Date());
 
-  // Хранилище недоступно — лимит не срабатывает и генерация идёт.
-  // Доступность важнее экономии на одном проходе.
+  // Суточный лимит — единственное, что стоит между публичной демкой с
+  // платным ключом и счётом за токены. Раньше неработающее хранилище
+  // молча пропускало проход: защита снималась ровно в тот момент, когда
+  // была нужна, и узнать об этом можно было только из счёта.
   let count = 0;
-  try {
-    count = await redis.incr(key);
-    if (count === 1) await redis.expire(key, DAY_SECONDS);
-  } catch {
-    // Без значений, ключа и адреса: в лог уходит только сам факт отказа,
-    // иначе молча отключившийся лимит не заметить до счёта за токены.
-    console.error("[directions] хранилище лимита недоступно, проход не учтён");
-    count = 0;
+  if (!isLimitConfigured()) {
+    if (process.env.NODE_ENV === "production") {
+      console.error("[directions] хранилище лимита не настроено, генерация запрещена");
+      return Response.json(
+        { error: "Сервис временно недоступен. Попробуйте позже." },
+        { status: 500 }
+      );
+    }
+    // Локальная разработка: поднимать Upstash ради одного прогона незачем,
+    // но без строки в логе отключённый лимит легко не заметить.
+    console.error("[directions] хранилище лимита не настроено, лимит не действует");
+  } else {
+    try {
+      count = await redis.incr(key);
+      if (count === 1) await redis.expire(key, DAY_SECONDS);
+    } catch {
+      // Без значений, ключа и адреса: в лог уходит только сам факт отказа.
+      console.error("[directions] хранилище лимита недоступно, проход запрещён");
+      return Response.json(
+        { error: "Не получилось проверить суточный лимит. Попробуйте через минуту." },
+        { status: 503 }
+      );
+    }
   }
 
   // incr считает вместе с текущим запросом (первый проход даёт 1),

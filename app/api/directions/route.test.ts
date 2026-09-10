@@ -6,9 +6,17 @@ import { zerno } from "@/lib/fixtures/zerno";
 // как и раньше: остальные тесты про лимит ничего не знают.
 const incrQueue = vi.hoisted(() => [] as number[]);
 
+// Отказ хранилища включается флагом, а не подменой мока в тесте: мок
+// живёт вне модульного графа, который сбрасывает resetModules, и ссылка
+// на него из теста после сброса указывала бы на прежний экземпляр.
+const incrFails = vi.hoisted(() => ({ value: false }));
+
 vi.mock("@/lib/redis", () => ({
   redis: {
-    incr: vi.fn(async () => incrQueue.shift() ?? 1),
+    incr: vi.fn(async () => {
+      if (incrFails.value) throw new Error("хранилище недоступно");
+      return incrQueue.shift() ?? 1;
+    }),
     expire: vi.fn().mockResolvedValue(1),
   },
   DAY_SECONDS: 86400,
@@ -69,8 +77,14 @@ async function readSections(res: Response) {
 
 beforeEach(() => {
   incrQueue.length = 0;
+  incrFails.value = false;
   process.env.APP_SALT = "тестовая-соль";
   process.env.POLZA_API_KEY = "тестовый-ключ";
+  // Хранилище лимита считается настроенным по умолчанию: мок redis выше
+  // изображает работающий Upstash, и без этих переменных маршрут решил бы,
+  // что лимита нет вовсе, и написал бы об этом в лог во всех тестах.
+  vi.stubEnv("KV_REST_API_URL", "https://пример.upstash.io");
+  vi.stubEnv("KV_REST_API_TOKEN", "тестовый-токен");
   vi.resetModules();
   // Сеть закрыта по умолчанию: если проверка выше по файлу сломается,
   // тест упадёт здесь, а не уйдёт живым запросом на polza.ai с ключом
@@ -82,6 +96,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.restoreAllMocks();
+  vi.unstubAllEnvs();
 });
 
 describe("POST /api/directions", () => {
@@ -140,6 +155,48 @@ describe("POST /api/directions", () => {
 
     const third = await post(brief);
     expect(third.status).toBe(429);
+  });
+
+  it("на отказ хранилища отвечает 503 и модель не зовёт", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    incrFails.value = true;
+
+    const res = await post({ brand: "уютная кофейня в центре города" });
+
+    expect(res.status).toBe(503);
+    // Код ответа здесь второстепенен. Главное — несделанный запрос:
+    // раньше сломанное хранилище пропускало проход, и каждый такой проход
+    // это живые деньги владельца ключа при снятой защите.
+    expect(global.fetch).not.toHaveBeenCalled();
+    expect(log).toHaveBeenCalledWith(expect.stringContaining("проход запрещён"));
+  });
+
+  it("без настроенного хранилища на боевом режиме отвечает 500 и модель не зовёт", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    // Переменные забыли завести на Vercel — самый вероятный способ
+    // выкатить публичную демку вообще без лимита.
+    vi.stubEnv("KV_REST_API_URL", "");
+    vi.stubEnv("KV_REST_API_TOKEN", "");
+    vi.stubEnv("NODE_ENV", "production");
+
+    const res = await post({ brand: "уютная кофейня в центре города" });
+
+    expect(res.status).toBe(500);
+    expect(global.fetch).not.toHaveBeenCalled();
+    expect(log).toHaveBeenCalledWith(expect.stringContaining("генерация запрещена"));
+  });
+
+  it("без настроенного хранилища в разработке генерация идёт, но лог кричит", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.stubEnv("KV_REST_API_URL", "");
+    vi.stubEnv("KV_REST_API_TOKEN", "");
+    global.fetch = vi.fn().mockResolvedValue(new Response(sseStream(), { status: 200 }));
+
+    const res = await post({ brand: "уютная кофейня в центре города" });
+
+    expect(res.status).toBe(200);
+    expect(await readSections(res)).toHaveLength(3);
+    expect(log).toHaveBeenCalledWith(expect.stringContaining("лимит не действует"));
   });
 
   it("дочитывает хвост: поток без завершающего перевода строки отдаёт все три направления", async () => {

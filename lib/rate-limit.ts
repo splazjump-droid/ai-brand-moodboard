@@ -21,6 +21,26 @@ export function isOverLimit(count: number): boolean {
 }
 
 /**
+ * Заведено ли хранилище суточного лимита. Интеграция Vercel кладёт
+ * переменные с префиксом KV_, отдельная установка Upstash — с UPSTASH_;
+ * годится любая полная пара, но именно пара: один адрес без токена
+ * хранилищем не является.
+ *
+ * Читается при вызове, а не при загрузке модуля: значение, застывшее на
+ * импорте, невозможно проверить тестом и легко получить не то, что стоит
+ * в окружении на момент запроса.
+ */
+export function isLimitConfigured(): boolean {
+  const pair = (url: string | undefined, token: string | undefined) =>
+    Boolean(url?.trim() && token?.trim());
+
+  return (
+    pair(process.env.KV_REST_API_URL, process.env.KV_REST_API_TOKEN) ||
+    pair(process.env.UPSTASH_REDIS_REST_URL, process.env.UPSTASH_REDIS_REST_TOKEN)
+  );
+}
+
+/**
  * Заголовок X-Forwarded-For содержит список адресов через запятую:
  * каждый прокси дописывает свой, ближайший к клиенту стоит первым.
  */
