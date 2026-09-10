@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
-import { ShowcaseView } from "@/components/showcase/ShowcaseView";
+import { Masthead } from "@/components/Masthead";
+import { LEAD_SHOWCASE, ShowcaseView } from "@/components/showcase/ShowcaseView";
 import { SHOWCASES, findShowcase } from "@/lib/fixtures";
 
 // Три адреса известны на сборке и собираются статически. dynamicParams: false
@@ -37,20 +38,7 @@ export default async function PrimerPage({
 
   return (
     <main className="shell">
-      <header className="masthead">
-        <p className="eyebrow">
-          <span className="eyebrow-mark" aria-hidden="true" />
-          Бренд-мудборд
-        </p>
-        <h1 className="masthead-title">
-          Бриф
-          <span className="masthead-title-light">на бренд</span>
-        </h1>
-        <p className="masthead-lead">
-          Три направления по одному брифу: осторожное, смелое и радикальное.
-        </p>
-      </header>
-
+      <Masthead lead={LEAD_SHOWCASE} />
       <ShowcaseView showcase={showcase} />
     </main>
   );

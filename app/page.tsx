@@ -1,15 +1,11 @@
 import { Masthead } from "@/components/Masthead";
 import { BriefFlow } from "@/components/brief/BriefFlow";
-import { ShowcaseView } from "@/components/showcase/ShowcaseView";
+import { LEAD_SHOWCASE, ShowcaseView } from "@/components/showcase/ShowcaseView";
 // Первым показываем обжарочную: тема понятна без объяснений, а три её
 // направления разведены по температуре сильнее прочих — разница между
 // уровнями риска читается с первого взгляда. Импорт именной, а не
 // SHOWCASES[0]: порядок в массиве не должен решать, что на главной.
 import { zerno } from "@/lib/fixtures/zerno";
-
-const LEAD_SHOWCASE =
-  "Три направления по одному короткому брифу: осторожное, смелое и радикальное. " +
-  "Ниже — записанный пример, а свой бриф можно собрать по ссылке под ним.";
 
 /**
  * Первым делом человек видит готовый результат, а не пустую форму: на
@@ -20,7 +16,8 @@ const LEAD_SHOWCASE =
 export default async function Home({
   searchParams,
 }: {
-  searchParams: Promise<{ brief?: string }>;
+  // Повтор ключа в адресе (?brief&brief) даёт массив, а не строку.
+  searchParams: Promise<{ brief?: string | string[] }>;
 }) {
   const { brief } = await searchParams;
   if (brief !== undefined) return <BriefFlow />;

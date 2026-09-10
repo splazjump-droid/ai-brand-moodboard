@@ -9,6 +9,15 @@ import "@/styles/result.css";
 import "@/styles/showcase.css";
 
 /**
+ * Лид страницы с витриной. Живёт рядом с самой витриной, а не в каждой
+ * странице отдельно: показывают её и главная, и три адреса примеров, и
+ * разъехавшийся текст между ними человек заметит раньше, чем мы.
+ */
+export const LEAD_SHOWCASE =
+  "Три направления по одному короткому брифу: осторожное, смелое и радикальное. " +
+  "Ниже — записанный пример, а свой бриф можно собрать по ссылке под ним.";
+
+/**
  * Записанный проход сервиса, показанный посетителю: бриф, три направления
  * и переключатель на соседние примеры. Ни одного обращения к модели —
  * человек видит результат за ноль секунд и не тратит суточный лимит.
@@ -20,7 +29,11 @@ import "@/styles/showcase.css";
 export function ShowcaseView({ showcase }: { showcase: Showcase }) {
   return (
     <section className="showcase" aria-label={`Пример: ${showcase.title}`}>
-      <nav className="showcase-switch reveal" style={{ "--i": 3 } as CSSProperties}>
+      <nav
+        className="showcase-switch reveal"
+        aria-label="Примеры"
+        style={{ "--i": 3 } as CSSProperties}
+      >
         <p className="showcase-note">
           <span className="showcase-mark" aria-hidden="true" />
           Записанный пример
@@ -50,7 +63,7 @@ export function ShowcaseView({ showcase }: { showcase: Showcase }) {
         ))}
       </div>
 
-      <p className="showcase-cta">
+      <p className="showcase-cta reveal" style={{ "--i": 5 } as CSSProperties}>
         <Link className="showcase-cta-link" href="/?brief">
           Собрать по своему брифу
         </Link>
