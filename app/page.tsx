@@ -1,112 +1,34 @@
-"use client";
+import { Masthead } from "@/components/Masthead";
+import { BriefFlow } from "@/components/brief/BriefFlow";
+import { ShowcaseView } from "@/components/showcase/ShowcaseView";
+// Первым показываем обжарочную: тема понятна без объяснений, а три её
+// направления разведены по температуре сильнее прочих — разница между
+// уровнями риска читается с первого взгляда. Импорт именной, а не
+// SHOWCASES[0]: порядок в массиве не должен решать, что на главной.
+import { zerno } from "@/lib/fixtures/zerno";
 
-import { useState, type CSSProperties } from "react";
+const LEAD_SHOWCASE =
+  "Три направления по одному короткому брифу: осторожное, смелое и радикальное. " +
+  "Ниже — записанный пример, а свой бриф можно собрать по ссылке под ним.";
 
-import { BriefForm } from "@/components/brief/BriefForm";
-import { BriefSummary } from "@/components/brief/BriefSummary";
-import { useDirections } from "@/components/brief/useDirections";
-import { DirectionCard } from "@/components/directions/DirectionCard";
-import type { Brief } from "@/lib/brief-schema";
-import { TIERS } from "@/lib/catalog";
-
-import "@/styles/result.css";
-
-const LEAD_BRIEF =
-  "Расскажите о бренде своими словами. В ответ придут три визуальных направления — " +
-  "осторожное, смелое и радикальное, каждое с концепцией, палитрой и типографикой.";
-
-const LEAD_RESULT =
-  "Три направления по одному брифу. Не то — поправьте бриф и соберите заново.";
-
-export default function Home() {
-  const [brief, setBrief] = useState<Partial<Brief>>({});
-  const { start, reset, directions, status, error } = useDirections();
-
-  const streaming = status === "streaming";
+/**
+ * Первым делом человек видит готовый результат, а не пустую форму: на
+ * решение у него секунд пятнадцать, а генерация идёт полминуты и стоит
+ * денег. Свой бриф открывается адресом `/?brief` — состояние живёт в
+ * ссылке, поэтому переход с любой страницы примера ведёт прямо в форму.
+ */
+export default async function Home({
+  searchParams,
+}: {
+  searchParams: Promise<{ brief?: string }>;
+}) {
+  const { brief } = await searchParams;
+  if (brief !== undefined) return <BriefFlow />;
 
   return (
     <main className="shell">
-      <header className="masthead">
-        <p className="eyebrow reveal" style={{ "--i": 0 } as CSSProperties}>
-          <span className="eyebrow-mark" aria-hidden="true" />
-          Бренд-мудборд
-        </p>
-        <h1 className="masthead-title reveal" style={{ "--i": 1 } as CSSProperties}>
-          Бриф
-          <span className="masthead-title-light">на бренд</span>
-        </h1>
-        <p className="masthead-lead reveal" style={{ "--i": 2 } as CSSProperties}>
-          {status === "idle" ? LEAD_BRIEF : LEAD_RESULT}
-        </p>
-      </header>
-
-      {/* Живая область смонтирована всегда и пуста до первой карточки:
-          область, пришедшая в DOM вместе со своим первым значением,
-          скринридером обычно не объявляется, а первое значение здесь и есть
-          сообщение. Видимый счёт ниже говорит то же самое глазами и потому
-          от озвучки скрыт. В ошибке область молчит: там говорит сама ошибка. */}
-      <p className="visually-hidden" aria-live="polite">
-        {status === "streaming" || status === "done"
-          ? `${directions.length} из ${TIERS.length}, ` +
-            (streaming ? "собираем направления" : "направления собраны")
-          : ""}
-      </p>
-
-      {status === "idle" ? (
-        <BriefForm
-          brief={brief}
-          onChange={setBrief}
-          onSubmit={start}
-          disabled={streaming}
-        />
-      ) : (
-        <div className="result">
-          <BriefSummary brief={brief} onEdit={reset} />
-
-          {/* Спиннера нет: карточки приходят по одной, это и есть индикация.
-              В ошибке счёт молчит: там говорит сама ошибка. */}
-          {status !== "error" && (
-            <p className="result-progress" aria-hidden="true">
-              <span className="result-progress-count">
-                {directions.length} из {TIERS.length}
-              </span>
-              <span className="result-progress-slots">
-                {TIERS.map((tier, i) => (
-                  <span
-                    key={tier}
-                    className="result-progress-slot"
-                    data-on={i < directions.length ? "" : undefined}
-                  />
-                ))}
-              </span>
-              <span className="result-progress-note">
-                {streaming ? "собираем направления" : "направления собраны"}
-              </span>
-            </p>
-          )}
-
-          {directions.length > 0 && (
-            <div className="result-grid">
-              {directions.map((direction) => (
-                <DirectionCard key={direction.tier} direction={direction} />
-              ))}
-            </div>
-          )}
-
-          {error && (
-            <div className="result-error" role="alert">
-              <p className="result-error-text">{error}</p>
-              <button
-                type="button"
-                className="result-retry"
-                onClick={() => start(brief)}
-              >
-                Ещё раз
-              </button>
-            </div>
-          )}
-        </div>
-      )}
+      <Masthead lead={LEAD_SHOWCASE} />
+      <ShowcaseView showcase={zerno} />
     </main>
   );
 }

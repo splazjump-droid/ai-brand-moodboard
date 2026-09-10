@@ -6,13 +6,16 @@ import type { Brief } from "@/lib/brief-schema";
  * Бриф, свёрнутый в одну строку: начало описания бренда и выход обратно
  * в форму. Хвост описания срезает CSS (`text-overflow: ellipsis`) — в JS
  * текст не режется, иначе длина обрезки не совпадала бы с шириной экрана.
+ *
+ * Без onEdit кнопка не рисуется: в витрине бриф записан заранее и править
+ * в нём нечего, а мёртвая кнопка хуже отсутствующей.
  */
 export function BriefSummary({
   brief,
   onEdit,
 }: {
   brief: Partial<Brief>;
-  onEdit: () => void;
+  onEdit?: () => void;
 }) {
   return (
     <section className="summary reveal" aria-label="Бриф">
@@ -21,9 +24,11 @@ export function BriefSummary({
         Бриф
       </p>
       <p className="summary-text">{brief.brand?.trim()}</p>
-      <button type="button" className="summary-edit" onClick={onEdit}>
-        Править
-      </button>
+      {onEdit && (
+        <button type="button" className="summary-edit" onClick={onEdit}>
+          Править
+        </button>
+      )}
     </section>
   );
 }
