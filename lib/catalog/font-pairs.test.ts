@@ -1,12 +1,16 @@
 import { readFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import { describe, it, expect } from "vitest";
 import { FONT_PAIRS } from "./index";
 
 // Каталог Google Fonts живёт вне репозитория: он большой и лицензионно смешанный,
 // копировать его сюда нельзя. Зависимость осознанная — проект уже опирается на этот
 // снимок как на источник правды по шрифтам, палитрам и типографике (см. CLAUDE.md).
-const GOOGLE_FONTS_CSV =
-  "/Users/artemfrolov/.claude/skills/ui-ux-pro-max-skill/src/ui-ux-pro-max/data/google-fonts.csv";
+const GOOGLE_FONTS_CSV = join(
+  homedir(),
+  ".claude/skills/ui-ux-pro-max-skill/src/ui-ux-pro-max/data/google-fonts.csv",
+);
 
 /** Читает из каталога карту «семейство → список subsets». */
 function readSubsets(): Map<string, string[]> {

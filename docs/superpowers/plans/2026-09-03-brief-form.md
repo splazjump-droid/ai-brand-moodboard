@@ -4,7 +4,7 @@
 
 **Goal:** Человек заполняет бриф о бренде и получает стримом три визуальных направления — Safe, Bold и Experimental — с концепцией, палитрой и типографикой из локального каталога.
 
-**Architecture:** Next.js App Router. Клиентская форма собирает объект и шлёт его в единственный route handler, тот валидирует схемой, проверяет суточный лимит в Upstash Redis и проксирует SSE-поток от Polza построчным JSON. Разбор потока и хеширование IP переносятся из соседнего проекта `/Users/artemfrolov/vyveska` вместе с тестами. Каталог дизайн-данных лежит срезом в репозитории: модель выбирает из него по id, а не выдумывает палитры и шрифты.
+**Architecture:** Next.js App Router. Клиентская форма собирает объект и шлёт его в единственный route handler, тот валидирует схемой, проверяет суточный лимит в Upstash Redis и проксирует SSE-поток от Polza построчным JSON. Разбор потока и хеширование IP переносятся из соседнего проекта `~/vyveska` вместе с тестами. Каталог дизайн-данных лежит срезом в репозитории: модель выбирает из него по id, а не выдумывает палитры и шрифты.
 
 **Tech Stack:** Next.js 16, React 19, TypeScript, zod 4, vitest 4, `@upstash/redis`.
 
@@ -268,7 +268,7 @@ Expected: FAIL, `Cannot find module './index'`
 import { readFileSync, writeFileSync } from "node:fs";
 import { parse } from "node:path";
 
-const SRC = "/Users/artemfrolov/.claude/skills/ui-ux-pro-max-skill/src/ui-ux-pro-max/data";
+const SRC = "~/.claude/skills/ui-ux-pro-max-skill/src/ui-ux-pro-max/data";
 
 // Разбор CSV с кавычками: поля каталога содержат запятые внутри значений,
 // поэтому split(",") здесь не работает.
@@ -1033,8 +1033,8 @@ git commit -m "Схема брифа и индикатор полноты"
 - [ ] **Step 1: Скопировать файл и его тесты**
 
 ```bash
-cp /Users/artemfrolov/vyveska/lib/stream.ts lib/stream.ts
-cp /Users/artemfrolov/vyveska/lib/stream.test.ts lib/stream.test.ts
+cp ~/vyveska/lib/stream.ts lib/stream.ts
+cp ~/vyveska/lib/stream.test.ts lib/stream.test.ts
 ```
 
 Код переносится без правок. Он уже разбирает SSE Polza, отдаёт `finish_reason` и возвращает недособранный хвост в остатке.

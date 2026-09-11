@@ -3,8 +3,10 @@
 // нужные поля вынимаются сюда один раз и коммитятся.
 // Запуск: node scripts/build-catalog.mjs
 import { readFileSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
 
-const SRC = "/Users/artemfrolov/.claude/skills/ui-ux-pro-max-skill/src/ui-ux-pro-max/data";
+const SRC = join(homedir(), ".claude/skills/ui-ux-pro-max-skill/src/ui-ux-pro-max/data");
 
 // Разбор CSV с кавычками: поля каталога содержат запятые внутри значений,
 // поэтому split(",") здесь не работает.
