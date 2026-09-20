@@ -75,6 +75,24 @@ async function readSections(res: Response) {
     .map((line) => JSON.parse(line) as { section: string; data: unknown });
 }
 
+/**
+ * Поток из готовых строк, как их отдаёт апстрим. В отличие от sseStream
+ * ничего не сериализует: строки уходят как есть, поэтому ими можно подать
+ * заведомо сломанный JSON — ровно то, чем модель ломает разбор на бою.
+ */
+function rawStream(lines: string[]): ReadableStream<Uint8Array> {
+  const frame = (content: string) =>
+    `data: ${JSON.stringify({ choices: [{ delta: { content } }] })}`;
+  const body = lines.map((l, i) => frame(i === lines.length - 1 ? l : `${l}\n`)).join("\n\n");
+  const encoder = new TextEncoder();
+  return new ReadableStream({
+    start(controller) {
+      controller.enqueue(encoder.encode(body));
+      controller.close();
+    },
+  });
+}
+
 beforeEach(() => {
   incrQueue.length = 0;
   incrFails.value = false;
@@ -227,6 +245,31 @@ describe("POST /api/directions", () => {
     const res = await post({ brand: "уютная кофейня в центре города" });
     expect(await readSections(res)).toHaveLength(3);
     expect(log).toHaveBeenCalledWith(expect.stringContaining("схему прошло 0/3"));
+  });
+
+
+  it("лог различает «прислали мало» и «прислали, но не разобралось»", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    // Модель прислала три строки, но у двух не хватает закрывающей скобки
+    // в таком месте, где починка скобок не помогает: JSON битый по сути.
+    const good = JSON.stringify({ section: "direction", data: zerno.directions[2] });
+    global.fetch = vi.fn().mockResolvedValue(
+      new Response(
+        rawStream([`{"section":"direction","data":{"tier":"safe","conce`, `{"section":`, good]),
+        { status: 200 }
+      )
+    );
+
+    const res = await post({ brand: "уютная кофейня в центре города" });
+    await readSections(res);
+
+    // Раньше лог сказал бы «секций 1» и умолчал, что строк было три:
+    // одно и то же число для двух разных поломок с разной починкой.
+    expect(log).toHaveBeenCalledWith(expect.stringContaining("строк от модели 3"));
+    expect(log).toHaveBeenCalledWith(expect.stringContaining("секций 1"));
+    expect(log).toHaveBeenCalledWith(expect.stringContaining("схему прошло 1/3"));
+    // И показал начала строк — иначе непонятно, чем именно сломан ответ.
+    expect(log).toHaveBeenCalledWith(expect.stringContaining("строка 1:"));
   });
 
   it("на исправном потоке в лог не пишет", async () => {

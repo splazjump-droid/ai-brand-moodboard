@@ -180,6 +180,12 @@ export async function POST(req: Request) {
       let finishReason: string | null = null;
       let delivered = 0;
       let valid = 0;
+      // Весь текст от модели целиком. Нужен только логу: delivered считает
+      // РАЗОБРАННЫЕ секции, и «секций 1» одинаково выглядит и когда модель
+      // прислала одну строку, и когда прислала три, а две не сложились в
+      // JSON. Это разные поломки с разной починкой, и различает их только
+      // сырой объём. Полтора килобайта в памяти на проход.
+      let rawText = "";
 
       // Клиенту уходит всё: накопление на той стороне устойчиво к мусору,
       // и решать, что показывать, должно оно. А считаем прошедшее схему:
@@ -204,7 +210,9 @@ export async function POST(req: Request) {
           sseBuffer = sse.remainder;
           finishReason = sse.finishReason ?? finishReason;
 
-          textBuffer += sse.chunks.join("");
+          const text = sse.chunks.join("");
+          rawText += text;
+          textBuffer += text;
           const parsedChunk = parseSectionBuffer(textBuffer);
           textBuffer = parsedChunk.remainder;
           flush(parsedChunk.sections);
@@ -217,18 +225,31 @@ export async function POST(req: Request) {
           // теряется всегда.
           sseBuffer += decoder.decode();
           const tail = parseSSEBuffer(`${sseBuffer}\n`);
-          textBuffer += tail.chunks.join("");
+          const tailText = tail.chunks.join("");
+          rawText += tailText;
+          textBuffer += tailText;
           finishReason = tail.finishReason ?? finishReason;
           flush(parseSectionBuffer(`${textBuffer}\n`).sections);
 
           if (valid < TIERS.length) {
             // Обрыв генерации и несошедшаяся схема для человека выглядят
             // одинаково: пустой экран и потраченный проход. Различает их
-            // только расхождение между «пришло» и «прошло схему».
+            // расхождение между «прислали», «разобрали» и «прошло схему» —
+            // все три числа нужны, любые два оставляют развилку.
+            const lines = rawText.split("\n").filter((l) => l.trim());
             console.error(
-              `[directions] секций ${delivered}, схему прошло ${valid}/${TIERS.length},` +
+              `[directions] строк от модели ${lines.length}, секций ${delivered},` +
+                ` схему прошло ${valid}/${TIERS.length}, знаков ${rawText.length},` +
                 ` finish_reason: ${finishReason ?? "не пришёл"}`
             );
+            // Строки, не ставшие секциями, — единственное место, где видно
+            // ЧЕМ именно сломан ответ. Начала хватает: поломка модели всегда
+            // в конце строки, а целиком выводить незачем.
+            if (lines.length > delivered) {
+              for (const [i, line] of lines.entries()) {
+                console.error(`[directions] строка ${i + 1}: ${line.slice(0, 120)}`);
+              }
+            }
           }
 
           controller.close();
